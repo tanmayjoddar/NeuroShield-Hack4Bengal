@@ -5,7 +5,7 @@ interface ImportMetaEnv {
   readonly VITE_CIVIC_CLIENT_ID: string;
   readonly VITE_CIVIC_APP_ID: string;
   readonly VITE_CIVIC_SBT_ADDRESS: string;
-  readonly VITE_CIVIC_VERIFIER_ADDRESS: string;
+  readonly VITE_WALLET_VERIFIER_ADDRESS: string;
 
   // Contract addresses
   readonly VITE_CONTRACT_ADDRESS_MAINNET: string;

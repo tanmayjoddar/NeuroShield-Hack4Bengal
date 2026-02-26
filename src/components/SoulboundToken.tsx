@@ -15,7 +15,6 @@ import {
   computeLiveTrustScore,
   mintSBT,
   updateSBT,
-  determineVerificationLevel,
   levelToString,
   levelToColor,
   onSBTMinted,
@@ -139,15 +138,8 @@ const SoulboundToken: React.FC = () => {
     setSuccess(null);
 
     try {
-      // Compute the trust score and verification level from live data
-      const params = await determineVerificationLevel(walletAddress, true);
-
-      const result = await mintSBT({
-        verificationLevel: Math.max(1, params.level), // At least Basic
-        trustScore: params.trustScore,
-        votingAccuracy: params.accuracy,
-        doiParticipation: params.participation,
-      });
+      // WalletVerifier computes score entirely on-chain — no params needed
+      const result = await mintSBT();
 
       if (result.success) {
         setSuccess(`SBT minted! TX: ${result.txHash?.slice(0, 10)}...`);
@@ -170,14 +162,8 @@ const SoulboundToken: React.FC = () => {
     setSuccess(null);
 
     try {
-      const params = await determineVerificationLevel(walletAddress, true);
-
-      const result = await updateSBT({
-        verificationLevel: Math.max(1, params.level),
-        trustScore: params.trustScore,
-        votingAccuracy: params.accuracy,
-        doiParticipation: params.participation,
-      });
+      // WalletVerifier refreshes score entirely on-chain
+      const result = await updateSBT();
 
       if (result.success) {
         setSuccess(`SBT updated! TX: ${result.txHash?.slice(0, 10)}...`);
@@ -313,27 +299,21 @@ const SoulboundToken: React.FC = () => {
               {breakdown && (
                 <>
                   <TrustScoreBar
-                    label="🧑 Verified Human (Civic)"
-                    value={breakdown.civicVerification}
+                    label="💰 Wallet History"
+                    value={breakdown.walletHistory}
                     max={40}
                     color="#8b5cf6"
                   />
                   <TrustScoreBar
-                    label="📊 Transaction History"
-                    value={breakdown.transactionHistory}
-                    max={20}
-                    color="#3b82f6"
-                  />
-                  <TrustScoreBar
                     label="🎯 DAO Voting Accuracy"
                     value={breakdown.votingAccuracy}
-                    max={20}
+                    max={30}
                     color="#10b981"
                   />
                   <TrustScoreBar
                     label="🗳️ DAO Participation"
                     value={breakdown.daoParticipation}
-                    max={20}
+                    max={30}
                     color="#f59e0b"
                   />
                 </>
@@ -478,27 +458,21 @@ const SoulboundToken: React.FC = () => {
                   This will be permanently encoded on-chain when you mint
                 </p>
                 <TrustScoreBar
-                  label="🧑 Verified Human (Civic)"
-                  value={liveBreakdown.civicVerification}
+                  label="💰 Wallet History"
+                  value={liveBreakdown.walletHistory}
                   max={40}
                   color="#8b5cf6"
                 />
                 <TrustScoreBar
-                  label="📊 Transaction History"
-                  value={liveBreakdown.transactionHistory}
-                  max={20}
-                  color="#3b82f6"
-                />
-                <TrustScoreBar
                   label="🎯 DAO Voting Accuracy"
                   value={liveBreakdown.votingAccuracy}
-                  max={20}
+                  max={30}
                   color="#10b981"
                 />
                 <TrustScoreBar
                   label="🗳️ DAO Participation"
                   value={liveBreakdown.daoParticipation}
-                  max={20}
+                  max={30}
                   color="#f59e0b"
                 />
                 <div className="mt-3 pt-3 border-t border-gray-700 flex justify-between">
@@ -528,7 +502,7 @@ const SoulboundToken: React.FC = () => {
                 </li>
                 <li>
                   ✓ <strong className="text-gray-300">Trust score</strong> —
-                  computed from Civic + transactions + DAO activity
+                  computed from wallet history + DAO activity
                 </li>
                 <li>
                   ✓ <strong className="text-gray-300">Updatable</strong> — your
@@ -554,7 +528,7 @@ const SoulboundToken: React.FC = () => {
               )}
             </button>
             <p className="text-center text-gray-500 text-xs mt-2">
-              Requires a valid Civic Pass and MON for gas
+              Requires MON for gas — score computed entirely on-chain
             </p>
           </>
         )}

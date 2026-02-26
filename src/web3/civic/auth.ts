@@ -1,5 +1,5 @@
-// Civic Auth Integration for NeuroShield
-// Connects to on-chain CivicVerifier + QuadraticVoting contracts for real verification
+// Wallet Verification Integration for NeuroShield
+// Connects to on-chain WalletVerifier + QuadraticVoting contracts for real verification
 // Falls back to local heuristics when contracts unavailable
 
 import { ethers } from "ethers";
@@ -51,10 +51,9 @@ interface TrustScoreData {
 // CONTRACT ABIs (minimal for reads)
 // ════════════════════════════════════════════
 
-const CIVIC_VERIFIER_ABI = [
-  "function isVerified(address _userAddress) view returns (bool)",
-  "function getVerificationLevel(address _userAddress) view returns (uint256)",
-  "function getUserVerification(address _userAddress) view returns (tuple(bool isVerified, uint256 verificationLevel, uint256 timestamp, uint256 trustScore, uint256 votingAccuracy, uint256 doiParticipation))",
+const WALLET_VERIFIER_ABI = [
+  "function computeTrustScore(address _wallet) view returns (uint256 trustScore, uint256 walletScore, uint256 daoAccuracy, uint256 daoParticipation, uint256 level)",
+  "function getWalletScore(address _wallet) view returns (uint256)",
 ];
 
 const QUADRATIC_VOTING_ABI = [
@@ -66,12 +65,14 @@ const QUADRATIC_VOTING_ABI = [
 ];
 
 // Contract addresses (loaded from env or defaults for Monad testnet)
-const CIVIC_VERIFIER_ADDRESS =
-  import.meta.env.VITE_CIVIC_VERIFIER_ADDRESS || "";
+const WALLET_VERIFIER_ADDRESS =
+  (addresses as any).walletVerifier ||
+  import.meta.env.VITE_WALLET_VERIFIER_ADDRESS ||
+  "";
 const QUADRATIC_VOTING_ADDRESS =
   (addresses as any).quadraticVoting ||
   import.meta.env.VITE_CONTRACT_ADDRESS_MONAD ||
-  "0x0000000000000000000000000000000000000000"; // loaded from addresses.json after deploy
+  "0x0000000000000000000000000000000000000000";
 
 // ════════════════════════════════════════════
 // HELPER: Get contract instances
@@ -95,13 +96,13 @@ const getQuadraticVotingContract = () => {
   }
 };
 
-const getCivicVerifierContract = () => {
+const getWalletVerifierContract = () => {
   const provider = getProvider();
-  if (!provider || !CIVIC_VERIFIER_ADDRESS) return null;
+  if (!provider || !WALLET_VERIFIER_ADDRESS) return null;
   try {
     return new ethers.Contract(
-      CIVIC_VERIFIER_ADDRESS,
-      CIVIC_VERIFIER_ABI,
+      WALLET_VERIFIER_ADDRESS,
+      WALLET_VERIFIER_ABI,
       provider,
     );
   } catch {
@@ -150,7 +151,8 @@ const setCachedVerification = (data: CachedVerification) => {
 // ════════════════════════════════════════════
 
 /**
- * Verify user identity using on-chain CivicVerifier contract.
+ * Verify user identity using on-chain WalletVerifier contract.
+ * Reads wallet balance + DAO stats to determine verification level.
  * Falls back to local cache if contract not available.
  * @param address User's wallet address
  * @returns Verification result
@@ -164,29 +166,36 @@ export const verifyCivicIdentity = async (
   source: "contract" | "local";
 }> => {
   try {
-    // Try on-chain verification first
-    const civicContract = getCivicVerifierContract();
-    if (civicContract) {
-      const isVerified = await civicContract.isVerified(address);
-      const level = await civicContract.getVerificationLevel(address);
+    // Try on-chain verification via WalletVerifier.computeTrustScore()
+    const walletVerifier = getWalletVerifierContract();
+    if (walletVerifier) {
+      try {
+        const result = await walletVerifier.computeTrustScore(address);
+        const trustScore = Number(result[0]);
+        const level = Number(result[4]);
 
-      const result = {
-        isVerified: Boolean(isVerified),
-        verificationLevel: Number(level),
-        expiry: isVerified ? Date.now() + 86400000 : undefined,
-        source: "contract" as const,
-      };
+        const isVerified = trustScore > 0;
 
-      // Cache the result
-      setCachedVerification({
-        address,
-        isVerified: result.isVerified,
-        verificationLevel: result.verificationLevel || 0,
-        timestamp: Date.now(),
-        source: "contract",
-      });
+        const verificationResult = {
+          isVerified,
+          verificationLevel: level,
+          expiry: isVerified ? Date.now() + 86400000 : undefined,
+          source: "contract" as const,
+        };
 
-      return result;
+        // Cache the result
+        setCachedVerification({
+          address,
+          isVerified,
+          verificationLevel: level,
+          timestamp: Date.now(),
+          source: "contract",
+        });
+
+        return verificationResult;
+      } catch {
+        // WalletVerifier call failed — try fallbacks
+      }
     }
 
     // Fallback: check local cache
@@ -208,7 +217,6 @@ export const verifyCivicIdentity = async (
         const participation = Number(stats.participation || 0);
 
         if (participation > 0) {
-          // Active DAO participant = implicitly verified
           const result = {
             isVerified: true,
             verificationLevel: participation >= 5 ? 2 : 1,
@@ -235,7 +243,7 @@ export const verifyCivicIdentity = async (
       source: "local",
     };
   } catch (error) {
-    console.error("Civic verification failed:", error);
+    console.error("Wallet verification failed:", error);
     return {
       isVerified: false,
       source: "local",
@@ -350,13 +358,12 @@ export const getCivicProfile = async (
  *
  * Priority:
  *   1. Read from CivicSBT.getTokenMetadata() — already stored on-chain by the SBT
- *   2. If no SBT exists, compute live from CivicVerifier + QuadraticVoting + provider
+ *   2. If no SBT exists, compute live from WalletVerifier + QuadraticVoting
  *
  * Formula (same in both paths):
- *   +40  Are you a verified human? (Civic)
- *   +20  Do you have transaction history?
- *   +20  Do you vote correctly in the DAO?
- *   +20  Do you actually participate?
+ *   +40  Wallet history (balance-based, proves real user)
+ *   +30  DAO voting accuracy
+ *   +30  DAO participation
  *   ────
  *   100  Permanent on-chain reputation
  *
@@ -383,7 +390,7 @@ export const calculateTrustScore = async (
         factors: {
           civicVerified: sbtMetadata.verificationLevel > 0,
           transactionHistory: {
-            totalCount: 0, // SBT doesn't store tx count, but trust score already accounts for it
+            totalCount: 0,
             successRate: finalScore > 0 ? 0.95 : 0,
           },
           daoActivity: {
@@ -397,11 +404,45 @@ export const calculateTrustScore = async (
     // SBT not available — fall through to live computation
   }
 
-  // ── Path 2: Compute live from contracts (no SBT minted yet) ──
+  // ── Path 2: Compute live from WalletVerifier (no SBT minted yet) ──
+
+  // Try WalletVerifier.computeTrustScore() first (single eth_call)
+  const walletVerifier = getWalletVerifierContract();
+  if (walletVerifier) {
+    try {
+      const result = await walletVerifier.computeTrustScore(address);
+      const trustScore = Number(result[0]);
+      const level_num = Number(result[4]);
+
+      let level: "High" | "Medium" | "Low";
+      if (trustScore >= 70) level = "High";
+      else if (trustScore >= 40) level = "Medium";
+      else level = "Low";
+
+      return {
+        score: trustScore,
+        level,
+        factors: {
+          civicVerified: level_num > 0,
+          transactionHistory: {
+            totalCount: 0,
+            successRate: trustScore > 0 ? 0.95 : 0,
+          },
+          daoActivity: {
+            votingAccuracy: Number(result[2]),
+            participation: Number(result[3]),
+          },
+        },
+      };
+    } catch {
+      // Fall through to manual computation
+    }
+  }
+
+  // Fallback: manual computation from individual contracts
   const verification = await verifyCivicIdentity(address);
   const isVerified = verification.isVerified;
 
-  // Get on-chain DAO activity
   let daoActivity = { votingAccuracy: 0, participation: 0 };
   const qvContract = getQuadraticVotingContract();
   if (qvContract) {
@@ -416,33 +457,30 @@ export const calculateTrustScore = async (
     }
   }
 
-  // Get transaction count from provider
-  let txCount = 0;
+  // Get balance as proxy for wallet history
+  let walletScore = 0;
   const provider = getProvider();
   if (provider) {
     try {
-      txCount = await provider.getTransactionCount(address);
+      const bal = await provider.getBalance(address);
+      if (bal > ethers.parseEther("5")) walletScore = 40;
+      else if (bal > ethers.parseEther("1")) walletScore = 30;
+      else if (bal > ethers.parseEther("0.1")) walletScore = 20;
+      else if (bal > ethers.parseEther("0.01")) walletScore = 10;
+      else if (bal > 0n) walletScore = 5;
     } catch {
       // Provider error
     }
   }
 
-  // Calculate trust score from real data
-  let baseScore = 0;
+  // Calculate trust score
+  let baseScore = walletScore;
 
-  // +40 for Civic verification
-  if (isVerified) baseScore += 40;
+  // +30 for DAO voting accuracy (scale 0-100 → 0-30)
+  baseScore += Math.min(30, Math.floor(daoActivity.votingAccuracy * 30 / 100));
 
-  // +20 for transaction history (scales with count)
-  const txScore = Math.min(20, Math.floor(txCount / 5));
-  baseScore += txScore;
-
-  // +20 for DAO voting accuracy
-  baseScore += Math.floor(daoActivity.votingAccuracy * 0.2);
-
-  // +20 for DAO participation (max at 10+ votes)
-  const participationScore = Math.min(20, daoActivity.participation * 2);
-  baseScore += participationScore;
+  // +30 for DAO participation (1 vote = 6 pts, max 30)
+  baseScore += Math.min(30, daoActivity.participation * 6);
 
   const finalScore = Math.min(100, baseScore);
 
@@ -457,8 +495,8 @@ export const calculateTrustScore = async (
     factors: {
       civicVerified: isVerified,
       transactionHistory: {
-        totalCount: txCount,
-        successRate: txCount > 0 ? 0.95 : 0,
+        totalCount: 0,
+        successRate: walletScore > 0 ? 0.95 : 0,
       },
       daoActivity,
     },

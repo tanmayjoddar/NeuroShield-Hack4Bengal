@@ -3,22 +3,22 @@
  *
  * Reads/writes CivicSBT contract on Monad testnet.
  * The SBT permanently encodes on-chain reputation:
- *   +40  Civic verification (are you a verified human?)
- *   +20  Transaction history (do you have on-chain activity?)
- *   +20  DAO voting accuracy (do you vote correctly?)
- *   +20  DAO participation (do you actually show up?)
+ *   +40  Wallet history (do you have real funds on-chain?)
+ *   +30  DAO voting accuracy (do you vote correctly?)
+ *   +30  DAO participation (do you actually show up?)
  *   ────
  *   100  Permanent on-chain reputation score
  *
  * Key properties:
  *   - Non-transferable (soulbound) — your reputation can't be bought or sold
  *   - Fully on-chain Base64 JSON metadata — works if every server goes offline
- *   - Authorized updaters only (CivicVerifier, admin) — no one else can modify
+ *   - Authorized updaters only (WalletVerifier, admin) — no one else can modify
+ *   - No external dependencies — every number from a real eth_call
  */
 
 import { ethers, Contract, BrowserProvider, JsonRpcProvider } from "ethers";
 import CivicSBTABI from "../abi/CivicSBT.json";
-import CivicVerifierABI from "../abi/CivicVerifier.json";
+import WalletVerifierABI from "../abi/WalletVerifier.json";
 import walletConnector from "../wallet";
 import addresses from "../addresses.json";
 
@@ -54,10 +54,9 @@ export interface SBTTokenURIData {
 }
 
 export interface TrustBreakdown {
-  civicVerification: number; // max 40
-  transactionHistory: number; // max 20
-  votingAccuracy: number; // max 20
-  daoParticipation: number; // max 20
+  walletHistory: number; // max 40
+  votingAccuracy: number; // max 30
+  daoParticipation: number; // max 30
   total: number; // max 100
 }
 
@@ -68,8 +67,10 @@ export type VerificationLevel = "Unverified" | "Basic" | "Advanced" | "Premium";
 // ════════════════════════════════════════════
 
 const CIVIC_SBT_ADDRESS = import.meta.env.VITE_CIVIC_SBT_ADDRESS || "";
-const CIVIC_VERIFIER_ADDRESS =
-  import.meta.env.VITE_CIVIC_VERIFIER_ADDRESS || "";
+const WALLET_VERIFIER_ADDRESS =
+  (addresses as any).walletVerifier ||
+  import.meta.env.VITE_WALLET_VERIFIER_ADDRESS ||
+  "";
 const MONAD_RPC = "https://testnet-rpc.monad.xyz";
 
 // QuadraticVoting ABI (voter stats only)
@@ -109,13 +110,13 @@ const getSBTContract = (
   }
 };
 
-const getVerifierContract = (
+const getWalletVerifierContract = (
   signerOrProvider?: ethers.ContractRunner | null,
 ): Contract | null => {
   const runner = signerOrProvider || getReadProvider();
-  if (!runner || !CIVIC_VERIFIER_ADDRESS) return null;
+  if (!runner || !WALLET_VERIFIER_ADDRESS) return null;
   try {
-    return new Contract(CIVIC_VERIFIER_ADDRESS, CivicVerifierABI.abi, runner);
+    return new Contract(WALLET_VERIFIER_ADDRESS, WalletVerifierABI, runner);
   } catch {
     return null;
   }
@@ -322,20 +323,22 @@ export const getSBTProfile = async (address: string): Promise<SBTProfile> => {
 // ════════════════════════════════════════════
 
 /**
- * Mint a new SBT for the connected wallet by registering verification
- * through the CivicVerifier contract.
+ * Mint a new SBT for the connected wallet via WalletVerifier.
  *
- * Flow: User → CivicVerifier.registerVerification() → CivicSBT.mint()
+ * Flow: User → WalletVerifier.mintSBT() → CivicSBT.mint()
  *
- * The CivicVerifier checks that the user has a valid Civic Pass,
- * then calls CivicSBT.mint() as an authorized updater.
+ * The WalletVerifier computes trust score entirely on-chain:
+ *   - Wallet balance (proxy for activity) → 0-40 pts
+ *   - QuadraticVoting.voterAccuracy() → 0-30 pts
+ *   - QuadraticVoting.voterParticipation() → 0-30 pts
+ *
+ * No external services, no mock contracts. Every number traceable.
  */
-export const mintSBT = async (params: {
-  verificationLevel: number;
-  trustScore: number;
-  votingAccuracy: number;
-  doiParticipation: number;
-}): Promise<{ success: boolean; txHash?: string; error?: string }> => {
+export const mintSBT = async (): Promise<{
+  success: boolean;
+  txHash?: string;
+  error?: string;
+}> => {
   try {
     if (!walletConnector.signer) {
       return {
@@ -351,42 +354,34 @@ export const mintSBT = async (params: {
     if (existing) {
       return {
         success: false,
-        error: "You already have a Soulbound Token. Use updateSBT() instead.",
+        error: "You already have a Soulbound Token. Use refreshSBT() instead.",
       };
     }
 
-    const verifier = getVerifierContract(walletConnector.signer);
+    const verifier = getWalletVerifierContract(walletConnector.signer);
     if (!verifier) {
       return {
         success: false,
         error:
-          "CivicVerifier contract not configured. Set VITE_CIVIC_VERIFIER_ADDRESS.",
+          "WalletVerifier contract not configured. Set VITE_WALLET_VERIFIER_ADDRESS.",
       };
     }
 
-    // Call registerVerification — this checks Civic Pass validity then mints SBT
-    const tx = await verifier.registerVerification(
-      userAddress,
-      params.verificationLevel,
-      params.trustScore,
-      params.votingAccuracy,
-      params.doiParticipation,
+    // Call mintSBT() — score is computed entirely on-chain
+    console.log(
+      `[SBT] Calling WalletVerifier.mintSBT()  |  contract: ${WALLET_VERIFIER_ADDRESS}`,
     );
+    const tx = await verifier.mintSBT();
 
     const receipt = await tx.wait();
+    console.log(`[SBT] ✅ SBT minted on-chain  |  tx: ${receipt.hash}`);
     return { success: true, txHash: receipt.hash };
   } catch (err: any) {
     console.error("[SBT] mintSBT failed:", err);
 
     // Parse common revert reasons
     const reason = err?.reason || err?.message || "Unknown error";
-    if (reason.includes("Sender not verified")) {
-      return {
-        success: false,
-        error: "You need a valid Civic Pass before minting an SBT.",
-      };
-    }
-    if (reason.includes("already has an SBT")) {
+    if (reason.includes("Already has SBT")) {
       return { success: false, error: "You already have a Soulbound Token." };
     }
     return { success: false, error: reason };
@@ -394,15 +389,17 @@ export const mintSBT = async (params: {
 };
 
 /**
- * Update the metadata on an existing SBT.
- * Called through CivicVerifier.registerVerification() which delegates to CivicSBT.updateMetadata().
+ * Refresh an existing SBT with latest on-chain data via WalletVerifier.
+ *
+ * Flow: User → WalletVerifier.refreshSBT() → CivicSBT.updateMetadata()
+ *
+ * Re-reads wallet balance and DAO stats, recomputes score on-chain.
  */
-export const updateSBT = async (params: {
-  verificationLevel: number;
-  trustScore: number;
-  votingAccuracy: number;
-  doiParticipation: number;
-}): Promise<{ success: boolean; txHash?: string; error?: string }> => {
+export const updateSBT = async (): Promise<{
+  success: boolean;
+  txHash?: string;
+  error?: string;
+}> => {
   try {
     if (!walletConnector.signer) {
       return { success: false, error: "Wallet not connected." };
@@ -415,23 +412,21 @@ export const updateSBT = async (params: {
       return { success: false, error: "No SBT found. Mint one first." };
     }
 
-    const verifier = getVerifierContract(walletConnector.signer);
+    const verifier = getWalletVerifierContract(walletConnector.signer);
     if (!verifier) {
       return {
         success: false,
-        error: "CivicVerifier contract not configured.",
+        error: "WalletVerifier contract not configured.",
       };
     }
 
-    const tx = await verifier.registerVerification(
-      userAddress,
-      params.verificationLevel,
-      params.trustScore,
-      params.votingAccuracy,
-      params.doiParticipation,
+    console.log(
+      `[SBT] Calling WalletVerifier.refreshSBT()  |  contract: ${WALLET_VERIFIER_ADDRESS}`,
     );
+    const tx = await verifier.refreshSBT();
 
     const receipt = await tx.wait();
+    console.log(`[SBT] ✅ SBT refreshed on-chain  |  tx: ${receipt.hash}`);
     return { success: true, txHash: receipt.hash };
   } catch (err: any) {
     console.error("[SBT] updateSBT failed:", err);
@@ -447,34 +442,33 @@ export const updateSBT = async (params: {
 // ════════════════════════════════════════════
 
 /**
- * Decompose an on-chain SBT trust score into its 4 bar values.
+ * Decompose an on-chain SBT trust score into its bar values.
  *
- * All inputs come from on-chain contract storage (via getTokenMetadata eth_call):
- *   - metadata.verificationLevel  → stored on-chain, determines civic bar (0 or 40)
- *   - metadata.votingAccuracy      → stored on-chain (0-100%), scaled to bar (0-20)
- *   - metadata.doiParticipation    → stored on-chain (vote count), scaled to bar (0-20)
- *   - metadata.trustScore          → stored on-chain (the total), tx bar = remainder
+ * New formula (WalletVerifier):
+ *   +40  Wallet history (balance-based) → walletHistory bar
+ *   +30  DAO voting accuracy → votingAccuracy bar
+ *   +30  DAO participation → daoParticipation bar
  *
- * This is a deterministic, pure function: identical on-chain inputs always produce
- * identical bar values. Anyone can verify by reading getTokenMetadata() and applying
- * the same formula. The contract uses the same weights during mint/update.
+ * All inputs come from on-chain contract storage (via getTokenMetadata eth_call).
  */
 export const decomposeOnChainTrustScore = (
   metadata: SBTMetadata,
 ): TrustBreakdown => {
-  // Each component is derived from a specific on-chain field:
-  const civic = metadata.verificationLevel > 0 ? 40 : 0; // on-chain: verificationLevel
-  const accuracy = Math.min(20, Math.floor(metadata.votingAccuracy * 0.2)); // on-chain: votingAccuracy (0-100%)
-  const participation = Math.min(20, metadata.doiParticipation * 2); // on-chain: doiParticipation (count)
-  // Transaction history is not stored separately — derive from the on-chain total:
-  const txHistory = Math.min(
-    20,
-    Math.max(0, metadata.trustScore - civic - accuracy - participation),
+  // DAO accuracy: stored on-chain as raw 0-100, contract scales to 0-30
+  const accuracy = Math.min(
+    30,
+    Math.floor((metadata.votingAccuracy * 30) / 100),
+  );
+  // DAO participation: stored on-chain as vote count, contract scales 1 vote = 6 pts (max 30)
+  const participation = Math.min(30, metadata.doiParticipation * 6);
+  // Wallet history: derive from total minus DAO components
+  const walletHistory = Math.min(
+    40,
+    Math.max(0, metadata.trustScore - accuracy - participation),
   );
 
   return {
-    civicVerification: civic,
-    transactionHistory: txHistory,
+    walletHistory,
     votingAccuracy: accuracy,
     daoParticipation: participation,
     total: metadata.trustScore,
@@ -483,91 +477,102 @@ export const decomposeOnChainTrustScore = (
 
 /**
  * Compute a fresh trust score from LIVE on-chain data.
- * This is the real-time version that reads CivicVerifier + QuadraticVoting + provider.
+ * Reads WalletVerifier.computeTrustScore() which returns all components.
  *
- * Formula:
- *   +40  Are you a verified human? (Civic Pass valid)
- *   +20  Do you have transaction history? (min(20, floor(txCount/5)))
- *   +20  Do you vote correctly in the DAO? (floor(accuracy * 0.2))
- *   +20  Do you actually participate? (min(20, participation * 2))
+ * Formula (all on-chain, same as the contract):
+ *   +40  Wallet history (balance-based, proves real user)
+ *   +30  DAO voting accuracy (from QuadraticVoting.voterAccuracy)
+ *   +30  DAO participation (from QuadraticVoting.voterParticipation)
  *   ────
  *   100  Maximum possible trust score
  */
 export const computeLiveTrustScore = async (
   address: string,
 ): Promise<TrustBreakdown> => {
-  // Run all reads in parallel
-  const [civicData, daoData, txCount] = await Promise.allSettled([
-    // 1. Check civic verification
-    (async () => {
-      const verifier = getVerifierContract();
-      if (!verifier) return { isVerified: false, level: 0 };
-      try {
-        const verified = await verifier.isVerified(address);
-        const level = await verifier.getVerificationLevel(address);
-        console.log(
-          `[SBT] eth_call isVerified(${address}) → ${verified}  |  contract: ${CIVIC_VERIFIER_ADDRESS}`,
-        );
-        return { isVerified: Boolean(verified), level: Number(level) };
-      } catch {
-        return { isVerified: false, level: 0 };
-      }
-    })(),
+  // Try reading directly from WalletVerifier.computeTrustScore() — single eth_call
+  try {
+    const verifier = getWalletVerifierContract();
+    if (verifier) {
+      const result = await verifier.computeTrustScore(address);
+      const trustScore = Number(result[0]);
+      const walletScore = Number(result[1]);
+      const daoAccuracy = Number(result[2]);
+      const daoParticipation = Number(result[3]);
 
-    // 2. Check DAO stats
+      console.log(
+        `[SBT] eth_call computeTrustScore(${address}) → total=${trustScore}, wallet=${walletScore}, acc=${daoAccuracy}, part=${daoParticipation}  |  contract: ${WALLET_VERIFIER_ADDRESS}`,
+      );
+
+      return {
+        walletHistory: walletScore,
+        votingAccuracy: daoAccuracy,
+        daoParticipation: daoParticipation,
+        total: trustScore,
+      };
+    }
+  } catch (err) {
+    console.warn(
+      "[SBT] WalletVerifier.computeTrustScore failed, falling back:",
+      err,
+    );
+  }
+
+  // Fallback: read individual components
+  const [daoData, balance] = await Promise.allSettled([
+    // DAO stats from QuadraticVoting
     (async () => {
       const qv = getQVContract();
       if (!qv) return { accuracy: 0, participation: 0 };
       try {
-        const stats = await qv.getVoterStats(address);
+        const [acc, part] = await Promise.all([
+          qv.voterAccuracy(address),
+          qv.voterParticipation(address),
+        ]);
         console.log(
-          `[SBT] eth_call getVoterStats(${address}) → accuracy=${stats[0]}, participation=${stats[1]}  |  contract: ${QV_ADDRESS}`,
+          `[SBT] eth_call voterAccuracy(${address}) → ${acc}, voterParticipation → ${part}  |  contract: ${QV_ADDRESS}`,
         );
-        return {
-          accuracy: Number(stats.accuracy || stats[0] || 0),
-          participation: Number(stats.participation || stats[1] || 0),
-        };
+        return { accuracy: Number(acc), participation: Number(part) };
       } catch {
         return { accuracy: 0, participation: 0 };
       }
     })(),
 
-    // 3. Get transaction count
+    // Wallet balance
     (async () => {
       const provider = getReadProvider();
-      if (!provider) return 0;
+      if (!provider) return 0n;
       try {
-        return await provider.getTransactionCount(address);
+        return await provider.getBalance(address);
       } catch {
-        return 0;
+        return 0n;
       }
     })(),
   ]);
 
-  // Extract values (Promise.allSettled always returns)
-  const civic =
-    civicData.status === "fulfilled"
-      ? civicData.value
-      : { isVerified: false, level: 0 };
   const dao =
     daoData.status === "fulfilled"
       ? daoData.value
       : { accuracy: 0, participation: 0 };
-  const txn = txCount.status === "fulfilled" ? txCount.value : 0;
+  const bal = balance.status === "fulfilled" ? balance.value : 0n;
 
-  // Compute each component
-  const civicScore = civic.isVerified ? 40 : 0;
-  const txScore = Math.min(20, Math.floor(txn / 5));
-  const accuracyScore = Math.min(20, Math.floor(dao.accuracy * 0.2));
-  const participationScore = Math.min(20, dao.participation * 2);
-  const total = Math.min(
-    100,
-    civicScore + txScore + accuracyScore + participationScore,
-  );
+  // Compute wallet score (same thresholds as contract)
+  let walletScore = 0;
+  const balBigInt = typeof bal === "bigint" ? bal : BigInt(0);
+  if (balBigInt > ethers.parseEther("5")) walletScore = 40;
+  else if (balBigInt > ethers.parseEther("1")) walletScore = 30;
+  else if (balBigInt > ethers.parseEther("0.1")) walletScore = 20;
+  else if (balBigInt > ethers.parseEther("0.01")) walletScore = 10;
+  else if (balBigInt > 0n) walletScore = 5;
+
+  // DAO accuracy: raw 0-100 → scaled to 0-30
+  const accuracyScore = Math.min(30, Math.floor((dao.accuracy * 30) / 100));
+  // DAO participation: 1 vote = 6 pts, max 30
+  const participationScore = Math.min(30, dao.participation * 6);
+
+  const total = Math.min(100, walletScore + accuracyScore + participationScore);
 
   return {
-    civicVerification: civicScore,
-    transactionHistory: txScore,
+    walletHistory: walletScore,
     votingAccuracy: accuracyScore,
     daoParticipation: participationScore,
     total,
@@ -606,36 +611,47 @@ export const levelToColor = (level: number): string => {
 
 /**
  * Determine what verification level a user should get based on their on-chain activity.
- * Used when computing the parameters for mintSBT / updateSBT.
+ * Score is computed on-chain by WalletVerifier — this is just a preview read.
  */
 export const determineVerificationLevel = async (
   address: string,
-  hasCivicPass: boolean,
 ): Promise<{
   level: number;
   trustScore: number;
   accuracy: number;
   participation: number;
 }> => {
+  // Try reading directly from WalletVerifier (most accurate)
+  const verifier = getWalletVerifierContract();
+  if (verifier) {
+    try {
+      const result = await verifier.computeTrustScore(address);
+      return {
+        level: Number(result[4]), // level
+        trustScore: Number(result[0]), // trustScore
+        accuracy: Number(result[2]), // daoAccuracy (already scaled 0-30)
+        participation: Number(result[3]), // daoParticipation (already scaled 0-30)
+      };
+    } catch {
+      // fallback below
+    }
+  }
+
+  // Fallback: compute from live data
   const breakdown = await computeLiveTrustScore(address);
 
   let level = 0;
-  if (hasCivicPass) {
-    // Base level from Civic Pass
-    level = 1;
-    // Promote based on DAO activity
-    if (breakdown.daoParticipation >= 10 && breakdown.votingAccuracy >= 16) {
-      level = 3; // Premium: 5+ votes AND >80% accuracy
-    } else if (breakdown.daoParticipation >= 4) {
-      level = 2; // Advanced: 2+ DAO votes
-    }
-  }
+  if (breakdown.total >= 70)
+    level = 3; // Premium
+  else if (breakdown.total >= 40)
+    level = 2; // Advanced
+  else if (breakdown.total > 0) level = 1; // Basic
 
   return {
     level,
     trustScore: breakdown.total,
-    accuracy: Math.min(100, Math.floor(breakdown.votingAccuracy / 0.2)),
-    participation: Math.floor(breakdown.daoParticipation / 2),
+    accuracy: breakdown.votingAccuracy,
+    participation: breakdown.daoParticipation,
   };
 };
 

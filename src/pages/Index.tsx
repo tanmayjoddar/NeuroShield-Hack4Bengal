@@ -1019,7 +1019,7 @@ const Index = () => {
                     <div className="flex justify-between items-center p-3 bg-white/5 rounded-lg">
                       <span className="text-gray-400">Updatable By</span>
                       <span className="text-white font-mono">
-                        CivicVerifier (authorized only)
+                        WalletVerifier (authorized only)
                       </span>
                     </div>
                   </div>

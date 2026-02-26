@@ -259,7 +259,7 @@ const queryDAOScamDatabase = async (address: string): Promise<DAOResult> => {
  *   - If BOTH ML and DAO agree → high confidence
  *   - If they disagree → flag for community review
  *   - DAO-confirmed scams ALWAYS override ML "safe" verdict
- *   - Civic-verified senders get slight trust boost
+ *   - Wallet-verified senders get slight trust boost
  *
  * @param address Sender's wallet address
  * @param transaction Transaction details to analyze
@@ -332,7 +332,7 @@ export const dualVerification = async (
       combinedRiskScore = mlResult.riskScore * 0.6 + daoResult.scamScore * 0.4;
     }
 
-    // Civic verified senders get a small trust discount (max -10 points)
+    // Wallet-verified senders get a small trust discount (max -10 points)
     if (civicVerified && combinedRiskScore > 10) {
       const civicDiscount = Math.min(10, trustScore / 10);
       combinedRiskScore = Math.max(5, combinedRiskScore - civicDiscount);
@@ -447,7 +447,7 @@ function getRecommendation(
     case "high":
       return `🟠 HIGH RISK: Our AI detected suspicious patterns. ${daoResult.activeProposals > 0 ? "Community is also reviewing this address." : "Consider reporting to DAO."}`;
     case "medium":
-      return `🟡 MODERATE RISK: Some concerns detected. ${civicVerified ? "Your Civic verification adds trust." : "Verify with Civic to enhance security."}`;
+      return `🟡 MODERATE RISK: Some concerns detected. ${civicVerified ? "Your wallet verification adds trust." : "Build on-chain reputation to enhance security."}`;
     case "low":
       return `🟢 LOW RISK: Minor flags detected. ${civicVerified ? "Your verified status provides additional security." : ""}`;
     case "safe":

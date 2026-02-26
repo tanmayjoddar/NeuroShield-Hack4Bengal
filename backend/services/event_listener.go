@@ -166,7 +166,7 @@ func (s *EventListenerService) listenLoop() {
 	defer s.wg.Done()
 
 	backoff := time.Second // Initial reconnect delay
-	maxBackoff := 2 * time.Minute	
+	maxBackoff := 2 * time.Minute
 
 	for {
 		select {

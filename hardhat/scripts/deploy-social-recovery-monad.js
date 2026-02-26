@@ -22,7 +22,9 @@ async function main() {
 
   // Deploy the contract
   console.log("\n🚀 Deploying SocialRecoveryWallet...");
-  const SocialRecovery = await ethers.getContractFactory("SocialRecoveryWallet");
+  const SocialRecovery = await ethers.getContractFactory(
+    "SocialRecoveryWallet",
+  );
   const threshold = 2; // Number of guardians required for recovery
   const socialRecovery = await SocialRecovery.deploy(threshold);
   await socialRecovery.waitForDeployment();
@@ -33,7 +35,7 @@ async function main() {
   // Save the contract address
   const addressesPath = path.join(__dirname, "../../src/web3/addresses.json");
   let addresses = {};
-  
+
   try {
     if (fs.existsSync(addressesPath)) {
       addresses = JSON.parse(fs.readFileSync(addressesPath));
@@ -43,7 +45,7 @@ async function main() {
   }
 
   addresses.socialRecoveryWallet = contractAddress;
-  
+
   // Ensure the directory exists
   const dir = path.dirname(addressesPath);
   if (!fs.existsSync(dir)) {
@@ -56,7 +58,7 @@ async function main() {
   // Verify contract on Monad Explorer
   console.log("\n🔍 Verifying contract on Monad Explorer...");
   console.log("Waiting for deployment transaction confirmation...");
-  await new Promise(resolve => setTimeout(resolve, 20000)); // Wait 20s for transaction propagation
+  await new Promise((resolve) => setTimeout(resolve, 20000)); // Wait 20s for transaction propagation
 
   try {
     await hre.run("verify:verify", {
@@ -67,7 +69,9 @@ async function main() {
   } catch (error) {
     console.log("⚠️ Verification failed:", error.message);
     console.log("You can try verifying manually with:");
-    console.log(`npx hardhat verify --network monad_testnet ${contractAddress} ${threshold}`);
+    console.log(
+      `npx hardhat verify --network monad_testnet ${contractAddress} ${threshold}`,
+    );
   }
 
   // Summary
@@ -77,7 +81,10 @@ async function main() {
   console.log("📍 Contract:", contractAddress);
   console.log("👥 Guardian Threshold:", threshold);
   console.log("🌍 Network: Monad Testnet");
-  console.log("🔎 Explorer: https://explorer.testnet.monad.xyz/address/" + contractAddress);
+  console.log(
+    "🔎 Explorer: https://explorer.testnet.monad.xyz/address/" +
+      contractAddress,
+  );
   console.log("=================================================");
 }
 

@@ -85,7 +85,7 @@ const SBTPage: React.FC = () => {
             <div className="flex justify-between">
               <span className="text-gray-400">Updatable By</span>
               <span className="text-white font-mono">
-                CivicVerifier (authorized only)
+                WalletVerifier (authorized only)
               </span>
             </div>
           </div>
