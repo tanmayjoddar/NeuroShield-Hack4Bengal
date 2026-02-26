@@ -391,7 +391,12 @@ const WalletAnalytics: React.FC<WalletAnalyticsProps> = ({ walletAddress }) => {
           provider.getTransactionCount(address),
         ]);
 
-        console.log("[Analytics] Balance:", balance.toString(), "Nonce:", txCount);
+        console.log(
+          "[Analytics] Balance:",
+          balance.toString(),
+          "Nonce:",
+          txCount,
+        );
 
         setAnalytics({
           sent_tx_count: txCount,
@@ -427,7 +432,9 @@ const WalletAnalytics: React.FC<WalletAnalyticsProps> = ({ walletAddress }) => {
 
         // Use ALL logs — this is a single-user app, all scans belong to this user
         const myLogs = logs.filter((l) => l.to || l.from);
-        console.log(`[Analytics] Found ${myLogs.length} transaction logs for charts`);
+        console.log(
+          `[Analytics] Found ${myLogs.length} transaction logs for charts`,
+        );
 
         // --- Threat Score Timeline ---
         // Unique target addresses to batch-check scam status
