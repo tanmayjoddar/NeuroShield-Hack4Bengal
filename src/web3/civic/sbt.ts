@@ -77,7 +77,7 @@ const QV_ABI = [
   "function voterAccuracy(address) view returns (uint256)",
   "function voterParticipation(address) view returns (uint256)",
 ];
-const QV_ADDRESS = "0x7A791FE5A35131B7D98F854A64e7F94180F27C7B";
+const QV_ADDRESS = "0x7A791fe5A35131B7d98f854a64E7f94180F27C7b";
 
 // ════════════════════════════════════════════
 // HELPERS

@@ -1,48 +1,61 @@
 // Web3 Utility Functions for UnhackableWallet
 // Common helper functions for Ethereum address and value formatting
 
-import { ethers, formatUnits, parseUnits } from 'ethers';
+import { ethers, formatUnits, parseUnits } from "ethers";
 
 /**
  * Network information by chain ID
  */
-export const NETWORK_INFO = {  '1': {
-    name: 'Ethereum Mainnet',
-    displayName: 'Mainnet',
-    currency: 'ETH',
-    explorer: 'https://etherscan.io',
+export const NETWORK_INFO = {
+  "1": {
+    name: "Ethereum Mainnet",
+    displayName: "Mainnet",
+    currency: "ETH",
+    explorer: "https://etherscan.io",
     blockTime: 15, // seconds
     isTestnet: false,
-    logoUrl: '/ethereum.svg'
+    logoUrl: "/ethereum.svg",
   },
-  '5': {
-    name: 'Goerli',
-    displayName: 'Testnet',
-    currency: 'ETH',
-    explorer: 'https://goerli.etherscan.io',
+  "5": {
+    name: "Goerli",
+    displayName: "Testnet",
+    currency: "ETH",
+    explorer: "https://goerli.etherscan.io",
     blockTime: 15,
     isTestnet: true,
-    logoUrl: '/ethereum.svg'
+    logoUrl: "/ethereum.svg",
   },
-  '11155111': {
-    name: 'Sepolia',
-    displayName: 'Testnet',
-    currency: 'ETH',
-    explorer: 'https://sepolia.etherscan.io',
+  "11155111": {
+    name: "Sepolia",
+    displayName: "Testnet",
+    currency: "ETH",
+    explorer: "https://sepolia.etherscan.io",
     blockTime: 15,
     isTestnet: true,
-    logoUrl: '/ethereum.svg'
-  },  '10143': {
-    name: 'Monad',
-    displayName: 'Testnet',
-    currency: 'MON',
-    explorer: 'https://testnet.monadexplorer.com',
+    logoUrl: "/ethereum.svg",
+  },
+  "10143": {
+    name: "Monad",
+    displayName: "Testnet",
+    currency: "MON",
+    explorer: "https://testnet.monadexplorer.com",
     blockTime: 2, // Monad has much faster block times
     isTestnet: true,
-    logoUrl: '/monad.svg',
+    logoUrl: "/monad.svg",
     recommended: true,
-    rpcUrl: 'https://testnet-rpc.monad.xyz'
-  }
+    rpcUrl: "https://testnet-rpc.monad.xyz",
+  },
+  "143": {
+    name: "Monad",
+    displayName: "Testnet",
+    currency: "MON",
+    explorer: "https://testnet.monadexplorer.com",
+    blockTime: 2,
+    isTestnet: true,
+    logoUrl: "/monad.svg",
+    recommended: true,
+    rpcUrl: "https://testnet-rpc.monad.xyz",
+  },
 };
 
 /**
@@ -52,16 +65,21 @@ export const NETWORK_INFO = {  '1': {
  */
 export function isMonadNetwork(chainId: string | null | undefined): boolean {
   if (!chainId) return false;
-  
+
   // Handle both decimal and hex formats
-  if (chainId === '10143' || chainId === '0x2797') {
+  if (
+    chainId === "10143" ||
+    chainId === "0x279F" ||
+    chainId === "0x279f" ||
+    chainId === "143"
+  ) {
     return true;
   }
-  
+
   // Handle the case where it might be a hex string without '0x' prefix
   try {
     const chainIdNum = parseInt(chainId);
-    return chainIdNum === 10143;
+    return chainIdNum === 10143 || chainIdNum === 143;
   } catch {
     return false;
   }
@@ -72,7 +90,9 @@ export function isMonadNetwork(chainId: string | null | undefined): boolean {
  * @param {string} chainId - The current chain ID
  * @returns {number} Number of confirmations to wait for
  */
-export function getConfirmationThreshold(chainId: string | null | undefined): number {
+export function getConfirmationThreshold(
+  chainId: string | null | undefined,
+): number {
   return isMonadNetwork(chainId) ? 1 : 3; // Monad needs fewer confirmations
 }
 
@@ -93,7 +113,7 @@ export function getTxPollInterval(chainId: string | null | undefined): number {
  */
 export function getExplorerTxUrl(txHash: string, chainId: string): string {
   const network = NETWORK_INFO[chainId as keyof typeof NETWORK_INFO];
-  if (!network) return '';
+  if (!network) return "";
   return `${network.explorer}/tx/${txHash}`;
 }
 
@@ -103,9 +123,12 @@ export function getExplorerTxUrl(txHash: string, chainId: string): string {
  * @param {string} chainId - Chain ID
  * @returns {string} Explorer URL
  */
-export function getExplorerAddressUrl(address: string, chainId: string): string {
+export function getExplorerAddressUrl(
+  address: string,
+  chainId: string,
+): string {
   const network = NETWORK_INFO[chainId as keyof typeof NETWORK_INFO];
-  if (!network) return '';
+  if (!network) return "";
   return `${network.explorer}/address/${address}`;
 }
 
@@ -116,15 +139,15 @@ export function getExplorerAddressUrl(address: string, chainId: string): string 
  * @returns {string} Shortened address (e.g., 0x1234...5678)
  */
 export function shortenAddress(address: string, chars: number = 4): string {
-  if (!address) return '';
-  
-  const prefix = address.startsWith('0x') ? '0x' : '';
+  if (!address) return "";
+
+  const prefix = address.startsWith("0x") ? "0x" : "";
   const start = prefix.length;
-  
+
   if (address.length <= start + chars * 2) {
     return address;
   }
-  
+
   return `${address.substring(0, start + chars)}...${address.substring(address.length - chars)}`;
 }
 
@@ -134,8 +157,11 @@ export function shortenAddress(address: string, chars: number = 4): string {
  * @param {number} decimals - Number of decimal places (default: 4)
  * @returns {string} Formatted number
  */
-export function formatDecimal(value: number | string, decimals: number = 4): string {
-  const numValue = typeof value === 'string' ? parseFloat(value) : value;
+export function formatDecimal(
+  value: number | string,
+  decimals: number = 4,
+): string {
+  const numValue = typeof value === "string" ? parseFloat(value) : value;
   return numValue.toFixed(decimals);
 }
 
@@ -194,23 +220,27 @@ export function formatTxHash(hash: string, chars: number = 6): string {
  * @param {number} chainId - Network chain ID
  * @returns {string} Etherscan URL
  */
-export function getEtherscanUrl(value: string, type: 'address' | 'tx', chainId: number = 1): string {
+export function getEtherscanUrl(
+  value: string,
+  type: "address" | "tx",
+  chainId: number = 1,
+): string {
   // Base URLs for different networks
   const baseUrls: Record<number, string> = {
-    1: 'https://etherscan.io',
-    5: 'https://goerli.etherscan.io',
-    11155111: 'https://sepolia.etherscan.io',
-    137: 'https://polygonscan.com',
-    80001: 'https://mumbai.polygonscan.com',
-    56: 'https://bscscan.com',
-    97: 'https://testnet.bscscan.com',
-    42161: 'https://arbiscan.io',
-    10143: 'https://testnet.monadexplorer.com',
+    1: "https://etherscan.io",
+    5: "https://goerli.etherscan.io",
+    11155111: "https://sepolia.etherscan.io",
+    137: "https://polygonscan.com",
+    80001: "https://mumbai.polygonscan.com",
+    56: "https://bscscan.com",
+    97: "https://testnet.bscscan.com",
+    42161: "https://arbiscan.io",
+    10143: "https://testnet.monadexplorer.com",
     // Add more networks as needed
   };
-  
-  const baseUrl = baseUrls[chainId] || 'https://etherscan.io';
-  
+
+  const baseUrl = baseUrls[chainId] || "https://etherscan.io";
+
   return `${baseUrl}/${type}/${value}`;
 }
 
@@ -220,11 +250,14 @@ export function getEtherscanUrl(value: string, type: 'address' | 'tx', chainId: 
  * @param {string} currency - Currency symbol
  * @returns {string} Formatted currency string
  */
-export function formatCurrency(value: number, currency: string = 'USD'): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
+export function formatCurrency(
+  value: number,
+  currency: string = "USD",
+): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
     currency,
-    minimumFractionDigits: 2
+    minimumFractionDigits: 2,
   }).format(value);
 }
 
@@ -246,17 +279,17 @@ export function calculateGasFee(gasLimit: number, gasPrice: bigint): string {
  */
 export function getExplorerUrl(chainId: number): string {
   const explorers: Record<number, string> = {
-    1: 'https://etherscan.io',
-    5: 'https://goerli.etherscan.io',
-    11155111: 'https://sepolia.etherscan.io',
-    137: 'https://polygonscan.com',
-    80001: 'https://mumbai.polygonscan.com',
-    56: 'https://bscscan.com',
-    97: 'https://testnet.bscscan.com',
-    42161: 'https://arbiscan.io',
-    10143: 'https://testnet.monadexplorer.com',
+    1: "https://etherscan.io",
+    5: "https://goerli.etherscan.io",
+    11155111: "https://sepolia.etherscan.io",
+    137: "https://polygonscan.com",
+    80001: "https://mumbai.polygonscan.com",
+    56: "https://bscscan.com",
+    97: "https://testnet.bscscan.com",
+    42161: "https://arbiscan.io",
+    10143: "https://testnet.monadexplorer.com",
     // Add more networks as needed
   };
-  
-  return explorers[chainId] || 'https://etherscan.io';
+
+  return explorers[chainId] || "https://etherscan.io";
 }

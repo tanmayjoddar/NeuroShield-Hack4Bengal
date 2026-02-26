@@ -67,7 +67,7 @@ const QUADRATIC_VOTING_ABI = [
 // Contract addresses (loaded from env or defaults for Monad testnet)
 const CIVIC_VERIFIER_ADDRESS =
   import.meta.env.VITE_CIVIC_VERIFIER_ADDRESS || "";
-const QUADRATIC_VOTING_ADDRESS = "0x7A791FE5A35131B7D98F854A64e7F94180F27C7B";
+const QUADRATIC_VOTING_ADDRESS = "0x7A791fe5A35131B7d98f854a64E7f94180F27C7b";
 
 // ════════════════════════════════════════════
 // HELPER: Get contract instances

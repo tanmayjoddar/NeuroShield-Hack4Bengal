@@ -64,7 +64,11 @@ const CONTRACT_ADDRESSES: { [chainId: string]: string } = {
     "0x0000000000000000000000000000000000000000",
   "10143":
     import.meta.env.VITE_CONTRACT_ADDRESS_MONAD ||
-    "0x7A791FE5A35131B7D98F854A64e7F94180F27C7B", // Monad testnet address
+    "0x7A791fe5A35131B7d98f854a64E7f94180F27C7b", // Monad testnet address
+  // Fallback: some wallets/RPCs may report a different chain ID for Monad testnet
+  "143":
+    import.meta.env.VITE_CONTRACT_ADDRESS_MONAD ||
+    "0x7A791fe5A35131B7d98f854a64E7f94180F27C7b",
 };
 
 /**
@@ -74,7 +78,7 @@ class ContractService extends EventEmitter {
   private contractInstance: Contract | null = null;
 
   private QUADRATIC_VOTING_ADDRESS =
-    "0x7A791FE5A35131B7D98F854A64e7F94180F27C7B"; // Monad address
+    "0x7A791fe5A35131B7d98f854a64E7f94180F27C7b"; // Monad address
   private SHIELD_TOKEN_ADDRESS =
     (addresses as any).shieldToken ||
     import.meta.env.VITE_SHIELD_TOKEN_ADDRESS ||
@@ -112,8 +116,24 @@ class ContractService extends EventEmitter {
 
   private async init() {
     try {
+      // Try to recover wallet connection if provider/signer are missing
       if (!walletConnector.provider || !walletConnector.signer) {
-        throw new Error("Wallet not connected");
+        if (typeof window !== "undefined" && window.ethereum) {
+          const accounts = await window.ethereum.request({ method: "eth_accounts" });
+          if (accounts && accounts.length > 0) {
+            const { BrowserProvider } = await import("ethers");
+            walletConnector.provider = new BrowserProvider(window.ethereum);
+            walletConnector.signer = await walletConnector.provider.getSigner();
+            walletConnector.address = accounts[0];
+            const network = await walletConnector.provider.getNetwork();
+            walletConnector.chainId = Number(network.chainId);
+            console.log("init: Wallet auto-reconnected:", walletConnector.address);
+          } else {
+            throw new Error("Wallet not connected");
+          }
+        } else {
+          throw new Error("Wallet not connected");
+        }
       }
 
       // Get the chain ID
@@ -581,6 +601,27 @@ class ContractService extends EventEmitter {
     try {
       console.log("Starting report submission...");
 
+      // Ensure wallet connector has provider/signer — re-connect if needed
+      if (!walletConnector.provider || !walletConnector.signer) {
+        console.log("Wallet connector missing provider/signer, reconnecting...");
+        if (typeof window !== "undefined" && window.ethereum) {
+          const { BrowserProvider } = await import("ethers");
+          const accounts = await window.ethereum.request({ method: "eth_accounts" });
+          if (accounts && accounts.length > 0) {
+            walletConnector.provider = new BrowserProvider(window.ethereum);
+            walletConnector.signer = await walletConnector.provider.getSigner();
+            walletConnector.address = accounts[0];
+            const network = await walletConnector.provider.getNetwork();
+            walletConnector.chainId = Number(network.chainId);
+            console.log("Wallet reconnected:", walletConnector.address, "chain:", walletConnector.chainId);
+          } else {
+            throw new Error("Please connect your wallet first");
+          }
+        } else {
+          throw new Error("No wallet provider found. Please install MetaMask.");
+        }
+      }
+
       // Make sure contract is initialized
       if (!this.votingContract) {
         console.log("Initializing contract...");
@@ -599,7 +640,7 @@ class ContractService extends EventEmitter {
       const network = await walletConnector.provider?.getNetwork();
       const chainId = Number(network?.chainId || 0);
 
-      if (chainId !== 10143) {
+      if (chainId !== 10143 && chainId !== 143) {
         throw new Error("Please switch to Monad network (chain ID 10143)");
       }
 
@@ -612,6 +653,9 @@ class ContractService extends EventEmitter {
       if (!isValidAddress(suspiciousAddress)) {
         throw new Error("Please enter a valid address to report");
       }
+
+      // Normalize address to proper EIP-55 checksum
+      suspiciousAddress = ethers.getAddress(suspiciousAddress);
 
       // Verify we have the contract address
       if (
@@ -840,6 +884,8 @@ export const reportScam = async (
     if (!isValidAddress(scammer)) {
       throw new Error("Invalid address format");
     }
+    // Normalize to proper EIP-55 checksum so any valid hex address works
+    scammer = ethers.getAddress(scammer);
     if (!reason.trim()) {
       throw new Error("Reason is required");
     }

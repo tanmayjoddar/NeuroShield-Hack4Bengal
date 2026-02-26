@@ -1,9 +1,16 @@
 // Web3 Wallet Connection Module for UnhackableWallet
 // Handles connecting to MetaMask and other Ethereum wallet providers
 
-import { ethers, BrowserProvider, Signer, formatUnits, parseUnits, Contract } from 'ethers';
-import { NETWORK_INFO, isMonadNetwork } from './utils';
-import { IMEVProtection, createMEVProtection } from './mev-protection';
+import {
+  ethers,
+  BrowserProvider,
+  Signer,
+  formatUnits,
+  parseUnits,
+  Contract,
+} from "ethers";
+import { NETWORK_INFO, isMonadNetwork } from "./utils";
+import { IMEVProtection, createMEVProtection } from "./mev-protection";
 
 /**
  * Simple functions for basic wallet connection
@@ -20,12 +27,12 @@ export const switchToMonadNetwork = async (): Promise<boolean> => {
     return false;
   }
 
-  const chainId = '0x2797'; // 10143 in hex
-  
+  const chainId = "0x279F"; // 10143 in hex
+
   try {
     // Try to switch to Monad testnet
     await window.ethereum.request({
-      method: 'wallet_switchEthereumChain',
+      method: "wallet_switchEthereumChain",
       params: [{ chainId }],
     });
     return true;
@@ -34,17 +41,18 @@ export const switchToMonadNetwork = async (): Promise<boolean> => {
     if (error.code === 4902) {
       try {
         await window.ethereum.request({
-          method: 'wallet_addEthereumChain',
+          method: "wallet_addEthereumChain",
           params: [
             {
               chainId,
-              chainName: 'Monad Testnet',
+              chainName: "Monad Testnet",
               nativeCurrency: {
-                name: 'MON',
-                symbol: 'MON',
+                name: "MON",
+                symbol: "MON",
                 decimals: 18,
-              },              rpcUrls: ['https://testnet-rpc.monad.xyz'],
-              blockExplorerUrls: ['https://testnet.monadexplorer.com'],
+              },
+              rpcUrls: ["https://testnet-rpc.monad.xyz"],
+              blockExplorerUrls: ["https://testnet.monadexplorer.com"],
             },
           ],
         });
@@ -58,7 +66,7 @@ export const switchToMonadNetwork = async (): Promise<boolean> => {
       return false;
     }
   }
-}
+};
 
 /**
  * Simple functions for basic wallet connection
@@ -70,23 +78,27 @@ export const switchToMonadNetwork = async (): Promise<boolean> => {
  * @param {boolean} preferMonad - Whether to switch to Monad after connecting
  * @returns {Promise<string|null>} Connected wallet address or null if failed
  */
-export const connectWallet = async (preferMonad: boolean = true): Promise<string | null> => {
+export const connectWallet = async (
+  preferMonad: boolean = true,
+): Promise<string | null> => {
   if (!window.ethereum) {
     alert("Please install MetaMask!");
     return null;
   }
 
   try {
-    const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-    
+    const accounts = await window.ethereum.request({
+      method: "eth_requestAccounts",
+    });
+
     // If preferMonad is true, switch to Monad network after connecting
     if (preferMonad) {
-      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+      const chainId = await window.ethereum.request({ method: "eth_chainId" });
       if (!isMonadNetwork(chainId)) {
         await switchToMonadNetwork();
       }
     }
-    
+
     return accounts[0];
   } catch (error) {
     console.error("Error connecting to wallet:", error);
@@ -110,7 +122,7 @@ export const getProvider = (): BrowserProvider | null => {
 export const getSigner = async (): Promise<Signer | null> => {
   const provider = getProvider();
   if (!provider) return null;
-  
+
   try {
     return await provider.getSigner();
   } catch (error) {
@@ -129,12 +141,12 @@ class WalletConnector {
   address: string | null;
   chainId: number | null;
   networkName: string | null;
-  
+
   // Event handlers
   private _handleAccountsChanged: ((accounts: string[]) => void) | null;
   private _handleChainChanged: ((chainId: string) => void) | null;
   private _handleDisconnect: ((error: any) => void) | null;
-  
+
   // MEV Protection
   private mevProtection: IMEVProtection | null = null;
 
@@ -144,7 +156,7 @@ class WalletConnector {
     this.address = null;
     this.chainId = null;
     this.networkName = null;
-    
+
     // Initialize event handlers as null
     this._handleAccountsChanged = null;
     this._handleChainChanged = null;
@@ -156,7 +168,7 @@ class WalletConnector {
    * @returns {boolean} True if MetaMask is installed
    */
   isMetaMaskInstalled(): boolean {
-    return typeof window !== 'undefined' && window.ethereum !== undefined;
+    return typeof window !== "undefined" && window.ethereum !== undefined;
   }
   /**
    * Connect to wallet (MetaMask)
@@ -164,37 +176,46 @@ class WalletConnector {
    */
   async connect(): Promise<string> {
     if (!this.isMetaMaskInstalled()) {
-      throw new Error("MetaMask is not installed. Please install MetaMask browser extension.");
+      throw new Error(
+        "MetaMask is not installed. Please install MetaMask browser extension.",
+      );
     }
 
     try {
       // Request account access
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      
+      const accounts = await window.ethereum.request({
+        method: "eth_requestAccounts",
+      });
+
       if (accounts.length === 0) {
-        throw new Error("No accounts found. Please unlock your MetaMask wallet.");
+        throw new Error(
+          "No accounts found. Please unlock your MetaMask wallet.",
+        );
       }
 
       // Get provider, signer and address
       this.provider = new BrowserProvider(window.ethereum);
       this.signer = await this.provider.getSigner();
       this.address = accounts[0];
-      
+
       // Get network information
       const network = await this.provider.getNetwork();
-      this.chainId = Number(network.chainId);      // Always try to switch to Monad if not already on it
-      if (!isMonadNetwork(this.chainId.toString()) && !isMonadNetwork('0x' + this.chainId.toString(16))) {
+      this.chainId = Number(network.chainId); // Always try to switch to Monad if not already on it
+      if (
+        !isMonadNetwork(this.chainId.toString()) &&
+        !isMonadNetwork("0x" + this.chainId.toString(16))
+      ) {
         await switchToMonadNetwork();
         // Refresh network info after switch
         const newNetwork = await this.provider.getNetwork();
         this.chainId = Number(newNetwork.chainId);
       }
-      
+
       this.networkName = "Monad Testnet"; // Always show as Monad Testnet
 
       // Set up event listeners
       this._setupEventListeners();
-      
+
       return this.address;
     } catch (error) {
       console.error("Failed to connect wallet:", error);
@@ -211,17 +232,23 @@ class WalletConnector {
     this.address = null;
     this.chainId = null;
     this.networkName = null;
-    
+
     // Remove event listeners if needed
     if (window.ethereum) {
       if (this._handleAccountsChanged) {
-        window.ethereum.removeListener('accountsChanged', this._handleAccountsChanged);
+        window.ethereum.removeListener(
+          "accountsChanged",
+          this._handleAccountsChanged,
+        );
       }
       if (this._handleChainChanged) {
-        window.ethereum.removeListener('chainChanged', this._handleChainChanged);
+        window.ethereum.removeListener(
+          "chainChanged",
+          this._handleChainChanged,
+        );
       }
       if (this._handleDisconnect) {
-        window.ethereum.removeListener('disconnect', this._handleDisconnect);
+        window.ethereum.removeListener("disconnect", this._handleDisconnect);
       }
     }
   }
@@ -233,7 +260,7 @@ class WalletConnector {
     if (!this.signer || !this.address) {
       throw new Error("Wallet not connected");
     }
-    
+
     const balance = await this.provider!.getBalance(this.address);
     return formatUnits(balance, 18);
   }
@@ -242,7 +269,7 @@ class WalletConnector {
    * Get token balance for an ERC20 token
    * @param {string} tokenAddress - The ERC20 token contract address
    * @returns {Promise<string>} Token balance formatted with decimals
-   */  async getTokenBalance(tokenAddress: string): Promise<string> {
+   */ async getTokenBalance(tokenAddress: string): Promise<string> {
     if (!this.signer || !this.address) {
       throw new Error("Wallet not connected");
     }
@@ -262,13 +289,13 @@ class WalletConnector {
         name: "decimals",
         outputs: [{ name: "", type: "uint8" }],
         type: "function",
-      }
+      },
     ];
 
     const tokenContract = new Contract(tokenAddress, minABI, this.provider!);
     const balance = await tokenContract.balanceOf(this.address);
     const decimals = await tokenContract.decimals();
-    
+
     return formatUnits(balance, decimals);
   }
 
@@ -281,7 +308,7 @@ class WalletConnector {
     if (!this.signer) {
       throw new Error("Wallet not connected");
     }
-    
+
     return await this.signer.signMessage(message);
   }
 
@@ -293,21 +320,22 @@ class WalletConnector {
     if (!this.provider) {
       throw new Error("Wallet not connected");
     }
-    
+
     // Convert to hex format if it's a number
-    const chainIdHex = typeof chainId === 'number' 
-      ? `0x${chainId.toString(16)}` 
-      : chainId;
-    
+    const chainIdHex =
+      typeof chainId === "number" ? `0x${chainId.toString(16)}` : chainId;
+
     try {
       await window.ethereum.request({
-        method: 'wallet_switchEthereumChain',
+        method: "wallet_switchEthereumChain",
         params: [{ chainId: chainIdHex }],
       });
     } catch (error: any) {
       // This error code means the chain has not been added to MetaMask
       if (error.code === 4902) {
-        throw new Error("This network is not available in your MetaMask, please add it first");
+        throw new Error(
+          "This network is not available in your MetaMask, please add it first",
+        );
       }
       throw error;
     }
@@ -317,7 +345,7 @@ class WalletConnector {
    * Get friendly name for Ethereum network
    * @param {number} chainId - Network Chain ID
    * @returns {string} Network name
-   */  getNetworkName(chainId: number): string {
+   */ getNetworkName(chainId: number): string {
     // Get network info from utils
     const networkInfo = NETWORK_INFO[chainId.toString()];
     if (networkInfo) {
@@ -348,7 +376,7 @@ class WalletConnector {
       420: "Optimism Goerli",
       // Add more networks as needed
     };
-    
+
     return networks[chainId] || `Unknown Network (${chainId})`;
   }
 
@@ -364,13 +392,15 @@ class WalletConnector {
       if (accounts.length === 0) {
         // User disconnected their wallet
         this.disconnect();
-        window.dispatchEvent(new CustomEvent('wallet_disconnected'));
+        window.dispatchEvent(new CustomEvent("wallet_disconnected"));
       } else if (accounts[0] !== this.address) {
         // User switched accounts
         this.address = accounts[0];
-        window.dispatchEvent(new CustomEvent('wallet_accountChanged', { 
-          detail: { address: this.address } 
-        }));
+        window.dispatchEvent(
+          new CustomEvent("wallet_accountChanged", {
+            detail: { address: this.address },
+          }),
+        );
       }
     };
 
@@ -383,21 +413,25 @@ class WalletConnector {
     // Handle disconnect
     this._handleDisconnect = (error: any) => {
       this.disconnect();
-      window.dispatchEvent(new CustomEvent('wallet_disconnected', { 
-        detail: { error } 
-      }));
+      window.dispatchEvent(
+        new CustomEvent("wallet_disconnected", {
+          detail: { error },
+        }),
+      );
     };
 
     // Add event listeners
-    window.ethereum.on('accountsChanged', this._handleAccountsChanged);
-    window.ethereum.on('chainChanged', this._handleChainChanged);
-    window.ethereum.on('disconnect', this._handleDisconnect);
+    window.ethereum.on("accountsChanged", this._handleAccountsChanged);
+    window.ethereum.on("chainChanged", this._handleChainChanged);
+    window.ethereum.on("disconnect", this._handleDisconnect);
   }
 
   /**
    * Send a transaction with MEV protection
    */
-  async sendProtectedTransaction(tx: ethers.TransactionRequest): Promise<ethers.TransactionResponse> {
+  async sendProtectedTransaction(
+    tx: ethers.TransactionRequest,
+  ): Promise<ethers.TransactionResponse> {
     if (!this.provider || !this.address) {
       throw new Error("Wallet not connected");
     }
@@ -407,7 +441,7 @@ class WalletConnector {
       this.mevProtection = await createMEVProtection(this.provider, {
         enabled: true,
         useFlashbots: true,
-        slippageTolerance: 0.5
+        slippageTolerance: 0.5,
       });
     }
 
@@ -417,7 +451,9 @@ class WalletConnector {
   /**
    * Check if a transaction is protected against MEV
    */
-  async isTransactionProtected(tx: ethers.TransactionRequest): Promise<boolean> {
+  async isTransactionProtected(
+    tx: ethers.TransactionRequest,
+  ): Promise<boolean> {
     if (!this.provider || !this.address) {
       throw new Error("Wallet not connected");
     }
@@ -426,7 +462,7 @@ class WalletConnector {
       this.mevProtection = await createMEVProtection(this.provider, {
         enabled: true,
         useFlashbots: true,
-        slippageTolerance: 0.5
+        slippageTolerance: 0.5,
       });
     }
 
