@@ -757,7 +757,7 @@ const Index = () => {
           )}
           {activeTab === "dao" && (
             <div className="space-y-6">
-              <DAOPanel />
+              <DAOPanel onNavigateToReports={() => setActiveTab("reports")} />
             </div>
           )}
           {activeTab === "reports" && (

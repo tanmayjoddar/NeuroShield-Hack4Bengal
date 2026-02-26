@@ -240,7 +240,13 @@ When you send to it during the demo, the dual-layer UI will show the DAO boost.
 
 **TIME:** 4:15 – 5:15 (60 seconds)
 
-**ACTION:** Go to **DAO** tab. Find the proposal that was just created (or a recent one).
+> ⚠️ **SEQUENCE MATTERS:** Do NOT open the DAO tab before ACT 4. If you go to DAO before submitting a report, it shows "No Active Proposals" with a "Submit First Report" button (which navigates to Reports tab). That's fine for normal users — but in the demo, you want the proposal to already exist when you switch here. Submit the report in ACT 4 first, THEN switch to DAO.
+
+**ACTION:** Go to **DAO** tab. The proposal from ACT 4 appears immediately.
+
+[POINT AT the DAO header stats — SHIELD balance, Votes Cast, Voting Accuracy]
+
+> "Look at the top. My SHIELD token balance, my votes cast, my voting accuracy — all zero right now. Watch these change."
 
 **SAY:**
 
@@ -259,6 +265,10 @@ When you send to it during the demo, the dual-layer UI will show the DAO boost.
 [MetaMask popup → Confirm]
 
 > "Another real on-chain transaction. My vote is now recorded in the smart contract. My SHIELD tokens are staked."
+
+[POINT AT the DAO header stats — Votes Cast now shows 1]
+
+> "See that? Votes Cast just went from zero to one. Live on-chain state."
 
 [PAUSE — now drop the callback]
 
