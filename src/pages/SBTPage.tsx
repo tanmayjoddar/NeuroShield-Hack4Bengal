@@ -7,12 +7,10 @@
 
 import React from "react";
 import SoulboundToken from "@/components/SoulboundToken";
-import Header from "@/components/Header";
 
 const SBTPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <Header />
       <main className="max-w-2xl mx-auto px-4 py-8">
         {/* Page Header */}
         <div className="mb-8">

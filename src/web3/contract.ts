@@ -581,8 +581,8 @@ class ContractService extends EventEmitter {
       );
 
       console.log("Gas estimate:", gasEstimate.toString()); // Submit transaction with enough gas and handle gas price
-      const gasPrice = await walletConnector.provider?.getGasPrice();
-      console.log("Current gas price:", gasPrice?.toString());
+      const feeData = await walletConnector.provider?.getFeeData();
+      console.log("Current gas price:", feeData?.gasPrice?.toString());
 
       const tx = await this.votingContract.submitProposal(
         suspiciousAddress,
@@ -590,7 +590,7 @@ class ContractService extends EventEmitter {
         evidence,
         {
           gasLimit: (gasEstimate * 120n) / 100n, // Add 20% buffer
-          gasPrice: gasPrice,
+          gasPrice: feeData?.gasPrice,
         },
       );
 

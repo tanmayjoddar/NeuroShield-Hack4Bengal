@@ -99,8 +99,8 @@ const runMlScamDetection = async (
     // Populate what we can from the connected wallet provider.
     // These are cheap RPC calls (usually cached by MetaMask).
     try {
-      const provider = walletConnector.provider
-        ? new ethers.BrowserProvider(walletConnector.provider)
+      const provider = window.ethereum
+        ? new ethers.BrowserProvider(window.ethereum)
         : null;
 
       if (provider && transaction.from) {

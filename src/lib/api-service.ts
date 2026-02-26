@@ -1,16 +1,16 @@
 // Centralized API Service for Wallet Application
 // Provides consistent error handling, retry logic, and request/response processing
 
-import { 
-  ApiError, 
-  createApiError, 
-  calculateRetryDelay, 
-  RetryConfig, 
-  DEFAULT_RETRY_CONFIG 
-} from './api-errors';
+import {
+  ApiError,
+  createApiError,
+  calculateRetryDelay,
+  RetryConfig,
+  DEFAULT_RETRY_CONFIG,
+} from "./api-errors";
 
 export interface ApiRequestConfig {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   headers?: Record<string, string>;
   body?: any;
   timeout?: number;
@@ -29,10 +29,10 @@ class ApiService {
   private defaultHeaders: Record<string, string>;
   private defaultTimeout: number;
 
-  constructor(baseURL: string = '/api') {
+  constructor(baseURL: string = "/api") {
     this.baseURL = baseURL;
     this.defaultHeaders = {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     };
     this.defaultTimeout = 10000; // 10 seconds
   }
@@ -41,28 +41,28 @@ class ApiService {
    * Makes an HTTP request with automatic retry and error handling
    */
   async request<T = any>(
-    endpoint: string, 
-    config: ApiRequestConfig = {}
+    endpoint: string,
+    config: ApiRequestConfig = {},
   ): Promise<ApiResponse<T>> {
     const {
-      method = 'GET',
+      method = "GET",
       headers = {},
       body,
       timeout = this.defaultTimeout,
       retryConfig = {},
-      skipRetry = false
+      skipRetry = false,
     } = config;
 
     const finalRetryConfig = { ...DEFAULT_RETRY_CONFIG, ...retryConfig };
     const url = `${this.baseURL}${endpoint}`;
-    
+
     const requestHeaders = {
       ...this.defaultHeaders,
-      ...headers
+      ...headers,
     };
 
     let lastError: ApiError | null = null;
-    
+
     for (let attempt = 1; attempt <= finalRetryConfig.maxAttempts; attempt++) {
       try {
         const controller = new AbortController();
@@ -74,8 +74,9 @@ class ApiService {
           signal: controller.signal,
         };
 
-        if (body && method !== 'GET') {
-          requestInit.body = typeof body === 'string' ? body : JSON.stringify(body);
+        if (body && method !== "GET") {
+          requestInit.body =
+            typeof body === "string" ? body : JSON.stringify(body);
         }
 
         const response = await fetch(url, requestInit);
@@ -91,13 +92,21 @@ class ApiService {
             errorData = { message: errorText };
           }
 
-          const apiError = createApiError(response, undefined, errorData.message);
-          
+          const apiError = createApiError(
+            response,
+            undefined,
+            errorData.message,
+          );
+
           // Don't retry if explicitly disabled or error is not retryable
-          if (skipRetry || !apiError.retryable || attempt === finalRetryConfig.maxAttempts) {
+          if (
+            skipRetry ||
+            !apiError.retryable ||
+            attempt === finalRetryConfig.maxAttempts
+          ) {
             throw apiError;
           }
-          
+
           lastError = apiError;
           await this.delay(calculateRetryDelay(attempt, finalRetryConfig));
           continue;
@@ -106,7 +115,7 @@ class ApiService {
         // Parse successful response
         const responseText = await response.text();
         let data: T;
-        
+
         try {
           data = responseText ? JSON.parse(responseText) : null;
         } catch {
@@ -116,16 +125,23 @@ class ApiService {
         return {
           data,
           status: response.status,
-          headers: response.headers
+          headers: response.headers,
         };
-
       } catch (error) {
-        const apiError = error instanceof Error && 'type' in error 
-          ? error as ApiError
-          : createApiError(undefined, error as Error);
+        const apiError =
+          error instanceof Error &&
+          "type" in error &&
+          "retryable" in error &&
+          "timestamp" in error
+            ? (error as unknown as ApiError)
+            : createApiError(undefined, error as Error);
 
         // Don't retry if explicitly disabled or error is not retryable
-        if (skipRetry || !apiError.retryable || attempt === finalRetryConfig.maxAttempts) {
+        if (
+          skipRetry ||
+          !apiError.retryable ||
+          attempt === finalRetryConfig.maxAttempts
+        ) {
           throw apiError;
         }
 
@@ -141,36 +157,54 @@ class ApiService {
   /**
    * GET request helper
    */
-  async get<T = any>(endpoint: string, config?: Omit<ApiRequestConfig, 'method' | 'body'>): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { ...config, method: 'GET' });
+  async get<T = any>(
+    endpoint: string,
+    config?: Omit<ApiRequestConfig, "method" | "body">,
+  ): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { ...config, method: "GET" });
   }
 
   /**
    * POST request helper
    */
-  async post<T = any>(endpoint: string, body?: any, config?: Omit<ApiRequestConfig, 'method'>): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { ...config, method: 'POST', body });
+  async post<T = any>(
+    endpoint: string,
+    body?: any,
+    config?: Omit<ApiRequestConfig, "method">,
+  ): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { ...config, method: "POST", body });
   }
 
   /**
    * PUT request helper
    */
-  async put<T = any>(endpoint: string, body?: any, config?: Omit<ApiRequestConfig, 'method'>): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { ...config, method: 'PUT', body });
+  async put<T = any>(
+    endpoint: string,
+    body?: any,
+    config?: Omit<ApiRequestConfig, "method">,
+  ): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { ...config, method: "PUT", body });
   }
 
   /**
    * DELETE request helper
    */
-  async delete<T = any>(endpoint: string, config?: Omit<ApiRequestConfig, 'method' | 'body'>): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { ...config, method: 'DELETE' });
+  async delete<T = any>(
+    endpoint: string,
+    config?: Omit<ApiRequestConfig, "method" | "body">,
+  ): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { ...config, method: "DELETE" });
   }
 
   /**
    * PATCH request helper
    */
-  async patch<T = any>(endpoint: string, body?: any, config?: Omit<ApiRequestConfig, 'method'>): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { ...config, method: 'PATCH', body });
+  async patch<T = any>(
+    endpoint: string,
+    body?: any,
+    config?: Omit<ApiRequestConfig, "method">,
+  ): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { ...config, method: "PATCH", body });
   }
 
   /**
@@ -198,7 +232,7 @@ class ApiService {
    * Utility method for delays
    */
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
