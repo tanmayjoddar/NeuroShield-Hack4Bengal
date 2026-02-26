@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/use-toast';
-import { Shield } from 'lucide-react';
+import React, { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
+import { Shield } from "lucide-react";
 
 interface CivicAuthProps {
   onAuthSuccess: (token: string) => void;
@@ -10,11 +10,11 @@ interface CivicAuthProps {
   walletAddress?: string;
 }
 
-const CivicAuth: React.FC<CivicAuthProps> = ({ 
-  onAuthSuccess, 
-  onAuthError, 
+const CivicAuth: React.FC<CivicAuthProps> = ({
+  onAuthSuccess,
+  onAuthError,
   clientId = import.meta.env.VITE_CIVIC_CLIENT_ID,
-  walletAddress
+  walletAddress,
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -30,7 +30,7 @@ const CivicAuth: React.FC<CivicAuthProps> = ({
       toast({
         title: "Configuration Error",
         description: "Civic client ID is not configured",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -39,7 +39,7 @@ const CivicAuth: React.FC<CivicAuthProps> = ({
       toast({
         title: "Connect Wallet",
         description: "Please connect your wallet first",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -50,22 +50,25 @@ const CivicAuth: React.FC<CivicAuthProps> = ({
       // Here we'll add the actual Civic auth flow once you provide the client ID
       // For now, we're just simulating success
       const mockToken = "civic_" + Math.random().toString(36).substring(7);
-      
+
       setIsAuthenticated(true);
       onAuthSuccess(mockToken);
-      
+
       toast({
         title: "Authentication Success",
         description: "Successfully verified with Civic",
       });
     } catch (error) {
-      console.error('Civic auth error:', error);
+      console.error("Civic auth error:", error);
       onAuthError(error as Error);
-      
+
       toast({
         title: "Authentication Failed",
-        description: error instanceof Error ? error.message : "Failed to authenticate with Civic",
-        variant: "destructive"
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to authenticate with Civic",
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
@@ -81,14 +84,14 @@ const CivicAuth: React.FC<CivicAuthProps> = ({
       >
         <Shield className="h-4 w-4" />
         <span>
-          {isAuthenticated 
-            ? "✓ Verified with Civic" 
-            : isLoading 
-              ? "Verifying..." 
+          {isAuthenticated
+            ? "✓ Verified with Civic"
+            : isLoading
+              ? "Verifying..."
               : "Verify with Civic"}
         </span>
       </Button>
-      
+
       {!walletAddress && (
         <p className="text-sm text-gray-400">
           Connect your wallet to verify with Civic

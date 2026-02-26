@@ -22,7 +22,10 @@ async function main() {
 
   // Deploy CivicVerifier (requires both CivicPass + SBT addresses)
   const CivicVerifier = await ethers.getContractFactory("CivicVerifier");
-  const civicVerifier = await CivicVerifier.deploy(mockCivicPassAddr, civicSBTAddr);
+  const civicVerifier = await CivicVerifier.deploy(
+    mockCivicPassAddr,
+    civicSBTAddr,
+  );
   await civicVerifier.waitForDeployment();
   const civicVerifierAddr = await civicVerifier.getAddress();
   console.log(`CivicVerifier deployed to: ${civicVerifierAddr}`);
@@ -35,7 +38,10 @@ async function main() {
   // Deploy CivicGatedWallet (needs CivicVerifier, NOT MockCivicPass)
   const threshold = ethers.parseEther("1.0");
   const CivicGatedWallet = await ethers.getContractFactory("CivicGatedWallet");
-  const civicGatedWallet = await CivicGatedWallet.deploy(civicVerifierAddr, threshold);
+  const civicGatedWallet = await CivicGatedWallet.deploy(
+    civicVerifierAddr,
+    threshold,
+  );
   await civicGatedWallet.waitForDeployment();
   const civicGatedWalletAddr = await civicGatedWallet.getAddress();
   console.log(`CivicGatedWallet deployed to: ${civicGatedWalletAddr}`);
@@ -47,7 +53,9 @@ async function main() {
   console.log(`CivicVerifier:    ${civicVerifierAddr}`);
   console.log(`CivicGatedWallet: ${civicGatedWalletAddr}`);
   console.log("─────────────────────────────────────");
-  console.log("\nSet VITE_CIVIC_VERIFIER_ADDRESS=" + civicVerifierAddr + " in your .env");
+  console.log(
+    "\nSet VITE_CIVIC_VERIFIER_ADDRESS=" + civicVerifierAddr + " in your .env",
+  );
 }
 
 main()

@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 /**
  * @title CivicVerifier
  * @dev Manages Civic Pass verification and bridges identity to SBT minting.
- * 
+ *
  * Access control:
  *   - Admin can update contract addresses
  *   - Anyone can trigger verification for their own address (if Civic Pass valid)

@@ -16,10 +16,10 @@
  * This creates a self-improving defense system that gets stronger with use.
  */
 
-import { verifyCivicIdentity, calculateTrustScore } from './auth';
-import { ethers } from 'ethers';
-import walletConnector from '../wallet';
-import contractService from '../contract';
+import { verifyCivicIdentity, calculateTrustScore } from "./auth";
+import { ethers } from "ethers";
+import walletConnector from "../wallet";
+import contractService from "../contract";
 
 // ════════════════════════════════════════════
 // TYPES
@@ -28,25 +28,25 @@ import contractService from '../contract';
 interface TransactionData {
   from: string;
   to: string;
-  value: string;        // ETH value
-  data?: string;        // Calldata
+  value: string; // ETH value
+  data?: string; // Calldata
   gasPrice?: string;
   isContractInteraction?: boolean;
 }
 
 interface MLResult {
   isSafe: boolean;
-  riskScore: number;    // 0-100
-  prediction: string;   // "Fraud" | "Suspicious" | "Safe"
+  riskScore: number; // 0-100
+  prediction: string; // "Fraud" | "Suspicious" | "Safe"
   warnings: string[];
   details: Record<string, any>;
 }
 
 interface DAOResult {
   isKnownScam: boolean;
-  scamScore: number;    // 0-100 from on-chain
+  scamScore: number; // 0-100 from on-chain
   activeProposals: number;
-  communityVerdict: 'confirmed_scam' | 'under_review' | 'cleared' | 'unknown';
+  communityVerdict: "confirmed_scam" | "under_review" | "cleared" | "unknown";
 }
 
 interface DualLayerResult {
@@ -57,24 +57,25 @@ interface DualLayerResult {
   trustScore: number;
 
   // Combined assessment
-  combinedRiskScore: number;  // 0-100 (weighted combination)
+  combinedRiskScore: number; // 0-100 (weighted combination)
   combinedSafe: boolean;
-  riskLevel: 'critical' | 'high' | 'medium' | 'low' | 'safe';
+  riskLevel: "critical" | "high" | "medium" | "low" | "safe";
 
   // User-facing
   recommendation: string;
   warnings: string[];
 
   // Flywheel metadata
-  shouldFlagForDAO: boolean;  // Whether this tx should be submitted for DAO review
-  confidenceBoost: number;    // Extra confidence from dual-layer agreement
+  shouldFlagForDAO: boolean; // Whether this tx should be submitted for DAO review
+  confidenceBoost: number; // Extra confidence from dual-layer agreement
 }
 
 // ════════════════════════════════════════════
 // ML API INTEGRATION (Layer 1 - Instant)
 // ════════════════════════════════════════════
 
-const ML_API_URL = 'https://ml-fraud-transaction-detection.onrender.com/predict';
+const ML_API_URL =
+  "https://ml-fraud-transaction-detection.onrender.com/predict";
 const ML_API_TIMEOUT = 10000; // 10 second timeout
 
 /**
@@ -83,15 +84,17 @@ const ML_API_TIMEOUT = 10000; // 10 second timeout
  * We populate the 18-feature array with whatever on-chain data
  * the connected wallet provider can give us (balance, nonce, etc).
  */
-const runMlScamDetection = async (transaction: TransactionData): Promise<MLResult> => {
+const runMlScamDetection = async (
+  transaction: TransactionData,
+): Promise<MLResult> => {
   try {
     // ── Build the 18-feature payload ──────────────────────
     // Positions match the model's training dataset columns.
     const features = new Array(18).fill(0);
     const txValue = parseFloat(transaction.value) || 0;
-    const gasPrice = parseFloat(transaction.gasPrice || '20');
-    features[13] = txValue;   // current tx value
-    features[14] = gasPrice;  // gas price
+    const gasPrice = parseFloat(transaction.gasPrice || "20");
+    features[13] = txValue; // current tx value
+    features[14] = gasPrice; // gas price
 
     // Populate what we can from the connected wallet provider.
     // These are cheap RPC calls (usually cached by MetaMask).
@@ -123,8 +126,8 @@ const runMlScamDetection = async (transaction: TransactionData): Promise<MLResul
     const timeout = setTimeout(() => controller.abort(), ML_API_TIMEOUT);
 
     const response = await fetch(ML_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         from_address: transaction.from,
         to_address: transaction.to,
@@ -146,16 +149,16 @@ const runMlScamDetection = async (transaction: TransactionData): Promise<MLResul
     const result = await response.json();
 
     // Parse ML API response
-    const prediction = result.prediction || result.Prediction || 'Unknown';
+    const prediction = result.prediction || result.Prediction || "Unknown";
     let riskScore: number;
     const warnings: string[] = [];
 
-    if (prediction === 'Fraud') {
+    if (prediction === "Fraud") {
       riskScore = 85;
-      warnings.push('ML model detected fraudulent transaction pattern');
-    } else if (prediction === 'Suspicious') {
+      warnings.push("ML model detected fraudulent transaction pattern");
+    } else if (prediction === "Suspicious") {
       riskScore = 50;
-      warnings.push('ML model flagged suspicious activity');
+      warnings.push("ML model flagged suspicious activity");
     } else {
       riskScore = 10;
     }
@@ -175,14 +178,14 @@ const runMlScamDetection = async (transaction: TransactionData): Promise<MLResul
       details: result,
     };
   } catch (error: any) {
-    console.error('ML scam detection failed:', error);
+    console.error("ML scam detection failed:", error);
 
     // On timeout or error, return cautious result
     return {
       isSafe: false,
       riskScore: 50,
-      prediction: 'Unknown',
-      warnings: ['ML verification unavailable — exercise caution'],
+      prediction: "Unknown",
+      warnings: ["ML verification unavailable — exercise caution"],
       details: { error: error.message },
     };
   }
@@ -202,12 +205,12 @@ const queryDAOScamDatabase = async (address: string): Promise<DAOResult> => {
     const isKnownScam = await contractService.isScamAddress(address);
     const scamScore = await contractService.getScamScore(address);
 
-    let communityVerdict: DAOResult['communityVerdict'] = 'unknown';
+    let communityVerdict: DAOResult["communityVerdict"] = "unknown";
 
     if (isKnownScam) {
-      communityVerdict = 'confirmed_scam';
+      communityVerdict = "confirmed_scam";
     } else if (scamScore > 0) {
-      communityVerdict = 'under_review';
+      communityVerdict = "under_review";
     }
 
     // Check for active proposals about this address
@@ -215,11 +218,13 @@ const queryDAOScamDatabase = async (address: string): Promise<DAOResult> => {
     try {
       const reports = await contractService.getScamReports();
       activeProposals = reports.filter(
-        (r: any) => r.suspiciousAddress?.toLowerCase() === address.toLowerCase() && r.status === 'active'
+        (r: any) =>
+          r.suspiciousAddress?.toLowerCase() === address.toLowerCase() &&
+          r.status === "active",
       ).length;
 
       if (activeProposals > 0) {
-        communityVerdict = 'under_review';
+        communityVerdict = "under_review";
       }
     } catch {
       // Reports unavailable
@@ -232,12 +237,12 @@ const queryDAOScamDatabase = async (address: string): Promise<DAOResult> => {
       communityVerdict,
     };
   } catch (error) {
-    console.error('DAO database query failed:', error);
+    console.error("DAO database query failed:", error);
     return {
       isKnownScam: false,
       scamScore: 0,
       activeProposals: 0,
-      communityVerdict: 'unknown',
+      communityVerdict: "unknown",
     };
   }
 };
@@ -262,16 +267,17 @@ const queryDAOScamDatabase = async (address: string): Promise<DAOResult> => {
  */
 export const dualVerification = async (
   address: string,
-  transaction: TransactionData
+  transaction: TransactionData,
 ): Promise<DualLayerResult> => {
   try {
     // Run all three checks in parallel for speed
-    const [mlResult, daoResult, civicVerification, trustData] = await Promise.all([
-      runMlScamDetection(transaction),
-      queryDAOScamDatabase(transaction.to),
-      verifyCivicIdentity(address),
-      calculateTrustScore(address),
-    ]);
+    const [mlResult, daoResult, civicVerification, trustData] =
+      await Promise.all([
+        runMlScamDetection(transaction),
+        queryDAOScamDatabase(transaction.to),
+        verifyCivicIdentity(address),
+        calculateTrustScore(address),
+      ]);
 
     const civicVerified = civicVerification.isVerified;
     const trustScore = trustData.score;
@@ -287,25 +293,33 @@ export const dualVerification = async (
     // RULE 1: DAO-confirmed scam ALWAYS takes priority (community > ML)
     if (daoResult.isKnownScam) {
       combinedRiskScore = 95;
-      warnings.push('⚠️ DAO CONFIRMED SCAM: This address was flagged by community vote');
+      warnings.push(
+        "⚠️ DAO CONFIRMED SCAM: This address was flagged by community vote",
+      );
       confidenceBoost = 30; // Very high confidence when DAO confirms
     }
     // RULE 2: Both layers agree it's dangerous → very high risk
     else if (mlResult.riskScore > 60 && daoResult.scamScore > 30) {
-      combinedRiskScore = Math.min(100, (mlResult.riskScore * 0.5) + (daoResult.scamScore * 0.5) + 15);
-      warnings.push('Both AI and community flagged this address');
+      combinedRiskScore = Math.min(
+        100,
+        mlResult.riskScore * 0.5 + daoResult.scamScore * 0.5 + 15,
+      );
+      warnings.push("Both AI and community flagged this address");
       confidenceBoost = 20; // Dual agreement = high confidence
     }
     // RULE 3: ML flags but DAO hasn't reviewed → moderate risk, flag for review
-    else if (mlResult.riskScore > 60 && daoResult.communityVerdict === 'unknown') {
+    else if (
+      mlResult.riskScore > 60 &&
+      daoResult.communityVerdict === "unknown"
+    ) {
       combinedRiskScore = mlResult.riskScore;
-      warnings.push('AI flagged — pending community review');
+      warnings.push("AI flagged — pending community review");
       confidenceBoost = 0; // Single layer = normal confidence
     }
     // RULE 4: DAO has reports but ML says safe → still cautious
     else if (daoResult.scamScore > 0 && mlResult.riskScore < 30) {
       combinedRiskScore = Math.max(40, daoResult.scamScore);
-      warnings.push('Community reports exist for this address');
+      warnings.push("Community reports exist for this address");
       confidenceBoost = 5;
     }
     // RULE 5: Both layers agree it's safe → low risk
@@ -315,7 +329,7 @@ export const dualVerification = async (
     }
     // RULE 6: Default weighted average
     else {
-      combinedRiskScore = (mlResult.riskScore * 0.6) + (daoResult.scamScore * 0.4);
+      combinedRiskScore = mlResult.riskScore * 0.6 + daoResult.scamScore * 0.4;
     }
 
     // Civic verified senders get a small trust discount (max -10 points)
@@ -327,21 +341,25 @@ export const dualVerification = async (
     // Under review addresses get a minimum risk floor
     if (daoResult.activeProposals > 0 && combinedRiskScore < 30) {
       combinedRiskScore = 30;
-      warnings.push(`${daoResult.activeProposals} active DAO proposal(s) about this address`);
+      warnings.push(
+        `${daoResult.activeProposals} active DAO proposal(s) about this address`,
+      );
     }
 
-    combinedRiskScore = Math.round(Math.min(100, Math.max(0, combinedRiskScore)));
+    combinedRiskScore = Math.round(
+      Math.min(100, Math.max(0, combinedRiskScore)),
+    );
 
     // ════════════════════════════════════════════
     // RISK LEVEL CLASSIFICATION
     // ════════════════════════════════════════════
 
-    let riskLevel: DualLayerResult['riskLevel'];
-    if (combinedRiskScore >= 80) riskLevel = 'critical';
-    else if (combinedRiskScore >= 60) riskLevel = 'high';
-    else if (combinedRiskScore >= 40) riskLevel = 'medium';
-    else if (combinedRiskScore >= 20) riskLevel = 'low';
-    else riskLevel = 'safe';
+    let riskLevel: DualLayerResult["riskLevel"];
+    if (combinedRiskScore >= 80) riskLevel = "critical";
+    else if (combinedRiskScore >= 60) riskLevel = "high";
+    else if (combinedRiskScore >= 40) riskLevel = "medium";
+    else if (combinedRiskScore >= 20) riskLevel = "low";
+    else riskLevel = "safe";
 
     const combinedSafe = combinedRiskScore < 30;
 
@@ -352,14 +370,19 @@ export const dualVerification = async (
     // Flag for DAO review if ML flagged it but community hasn't reviewed yet
     const shouldFlagForDAO =
       mlResult.riskScore > 50 &&
-      daoResult.communityVerdict === 'unknown' &&
+      daoResult.communityVerdict === "unknown" &&
       daoResult.activeProposals === 0;
 
     // ════════════════════════════════════════════
     // RECOMMENDATION
     // ════════════════════════════════════════════
 
-    const recommendation = getRecommendation(riskLevel, civicVerified, daoResult, mlResult);
+    const recommendation = getRecommendation(
+      riskLevel,
+      civicVerified,
+      daoResult,
+      mlResult,
+    );
 
     return {
       mlResult,
@@ -375,17 +398,29 @@ export const dualVerification = async (
       confidenceBoost,
     };
   } catch (error) {
-    console.error('Dual verification failed:', error);
+    console.error("Dual verification failed:", error);
     return {
-      mlResult: { isSafe: false, riskScore: 75, prediction: 'Error', warnings: ['Verification failed'], details: {} },
-      daoResult: { isKnownScam: false, scamScore: 0, activeProposals: 0, communityVerdict: 'unknown' },
+      mlResult: {
+        isSafe: false,
+        riskScore: 75,
+        prediction: "Error",
+        warnings: ["Verification failed"],
+        details: {},
+      },
+      daoResult: {
+        isKnownScam: false,
+        scamScore: 0,
+        activeProposals: 0,
+        communityVerdict: "unknown",
+      },
       civicVerified: false,
       trustScore: 0,
       combinedRiskScore: 75,
       combinedSafe: false,
-      riskLevel: 'high',
-      recommendation: 'Verification failed. Do NOT proceed with this transaction.',
-      warnings: ['Dual-layer verification system encountered an error'],
+      riskLevel: "high",
+      recommendation:
+        "Verification failed. Do NOT proceed with this transaction.",
+      warnings: ["Dual-layer verification system encountered an error"],
       shouldFlagForDAO: false,
       confidenceBoost: 0,
     };
@@ -397,28 +432,28 @@ export const dualVerification = async (
 // ════════════════════════════════════════════
 
 function getRecommendation(
-  riskLevel: DualLayerResult['riskLevel'],
+  riskLevel: DualLayerResult["riskLevel"],
   civicVerified: boolean,
   daoResult: DAOResult,
-  mlResult: MLResult
+  mlResult: MLResult,
 ): string {
   if (daoResult.isKnownScam) {
-    return '🚫 BLOCKED: This address is a DAO-confirmed scam. Transaction strongly discouraged.';
+    return "🚫 BLOCKED: This address is a DAO-confirmed scam. Transaction strongly discouraged.";
   }
 
   switch (riskLevel) {
-    case 'critical':
+    case "critical":
       return `🔴 CRITICAL RISK (${mlResult.riskScore}% ML + ${daoResult.scamScore}% DAO): Do NOT proceed. Both AI and community have flagged this address.`;
-    case 'high':
-      return `🟠 HIGH RISK: Our AI detected suspicious patterns. ${daoResult.activeProposals > 0 ? 'Community is also reviewing this address.' : 'Consider reporting to DAO.'}`;
-    case 'medium':
-      return `🟡 MODERATE RISK: Some concerns detected. ${civicVerified ? 'Your Civic verification adds trust.' : 'Verify with Civic to enhance security.'}`;
-    case 'low':
-      return `🟢 LOW RISK: Minor flags detected. ${civicVerified ? 'Your verified status provides additional security.' : ''}`;
-    case 'safe':
-      return '✅ SAFE: Both AI and community database show no concerns. Transaction appears safe.';
+    case "high":
+      return `🟠 HIGH RISK: Our AI detected suspicious patterns. ${daoResult.activeProposals > 0 ? "Community is also reviewing this address." : "Consider reporting to DAO."}`;
+    case "medium":
+      return `🟡 MODERATE RISK: Some concerns detected. ${civicVerified ? "Your Civic verification adds trust." : "Verify with Civic to enhance security."}`;
+    case "low":
+      return `🟢 LOW RISK: Minor flags detected. ${civicVerified ? "Your verified status provides additional security." : ""}`;
+    case "safe":
+      return "✅ SAFE: Both AI and community database show no concerns. Transaction appears safe.";
     default:
-      return 'Unable to determine risk level. Proceed with caution.';
+      return "Unable to determine risk level. Proceed with caution.";
   }
 }
 
@@ -426,7 +461,9 @@ function getRecommendation(
  * Quick check: is this address known to be dangerous?
  * Fast path for the TransactionInterceptor.
  */
-export const quickScamCheck = async (address: string): Promise<{
+export const quickScamCheck = async (
+  address: string,
+): Promise<{
   isDangerous: boolean;
   reason?: string;
 }> => {
@@ -434,12 +471,15 @@ export const quickScamCheck = async (address: string): Promise<{
     // Check DAO database first (fastest, most authoritative)
     const isScam = await contractService.isScamAddress(address);
     if (isScam) {
-      return { isDangerous: true, reason: 'DAO-confirmed scam address' };
+      return { isDangerous: true, reason: "DAO-confirmed scam address" };
     }
 
     const scamScore = await contractService.getScamScore(address);
     if (scamScore > 50) {
-      return { isDangerous: true, reason: `High community scam score: ${scamScore}/100` };
+      return {
+        isDangerous: true,
+        reason: `High community scam score: ${scamScore}/100`,
+      };
     }
 
     return { isDangerous: false };

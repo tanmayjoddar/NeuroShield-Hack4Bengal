@@ -77,9 +77,9 @@ func (s *CivicAuthService) InitiateAuth(userAddress string, deviceInfo string) (
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
-	req, err := http.NewRequestWithContext(context.Background(), 
-		"POST", 
-		baseURL+"/gateway/token", 
+	req, err := http.NewRequestWithContext(context.Background(),
+		"POST",
+		baseURL+"/gateway/token",
 		bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %v", err)
@@ -138,9 +138,9 @@ func (s *CivicAuthService) VerifyGatepass(userAddress, gatepass string, deviceIn
 	// Verify with Civic gateway using REST API
 	baseURL := s.getBaseURL()
 
-	req, err := http.NewRequestWithContext(context.Background(), 
-		"GET", 
-		fmt.Sprintf("%s/gateway/token/%s", baseURL, gatepass), 
+	req, err := http.NewRequestWithContext(context.Background(),
+		"GET",
+		fmt.Sprintf("%s/gateway/token/%s", baseURL, gatepass),
 		nil)
 	if err != nil {
 		s.logVerificationAttempt(userAddress, "verification", false, deviceInfo)
@@ -179,7 +179,7 @@ func (s *CivicAuthService) VerifyGatepass(userAddress, gatepass string, deviceIn
 	if len(riskFactors) > 0 {
 		session.Flags = riskFactors
 		session.RiskScore = calculateRiskScore(riskFactors)
-		
+
 		// If risk is too high, require additional verification
 		if session.RiskScore > 0.7 {
 			session.SecurityLevel = 3
@@ -212,13 +212,13 @@ func (s *CivicAuthService) GetUserSession(userAddress string) (*models.CivicAuth
 // PerformSecurityChecks implements advanced security measures
 func (s *CivicAuthService) performSecurityChecks(userAddress, deviceInfo string) []string {
 	var flags []string
-	
+
 	// Check for multiple devices
 	var deviceCount int64
 	s.DB.Model(&models.CivicAuthSession{}).
 		Where("user_address = ? AND device_hash != ?", userAddress, generateDeviceHash(deviceInfo)).
 		Count(&deviceCount)
-	
+
 	if deviceCount > 2 {
 		flags = append(flags, "multiple_devices_detected")
 	}
@@ -228,7 +228,7 @@ func (s *CivicAuthService) performSecurityChecks(userAddress, deviceInfo string)
 	s.DB.Model(&models.CivicVerificationLog{}).
 		Where("user_address = ? AND created_at > ?", userAddress, time.Now().Add(-5*time.Minute)).
 		Count(&recentAttempts)
-	
+
 	if recentAttempts > 5 {
 		flags = append(flags, "rapid_verification_attempts")
 	}
