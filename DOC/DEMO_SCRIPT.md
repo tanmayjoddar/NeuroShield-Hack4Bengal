@@ -41,6 +41,7 @@ When you send to it during the demo, the dual-layer UI will show the DAO boost.
   Keep this terminal visible but small — you'll maximize it during ACT 6
 - [ ] Copy this address to clipboard: `0x098B716B8Aaf21512996dC57EB0615e2383E2f96`
 - [ ] Clear localStorage (`localStorage.clear()` in DevTools console) — fresh logs
+- [ ] Open DevTools Console (Cmd+Opt+J / Ctrl+Shift+J) — filter by `[SBT]` or `[DAO]` — keep Console docked to bottom, 3 rows tall. As each act runs, provenance logs appear in real time. Judges watching the console see proof accumulating.
 - [ ] Test MetaMask popup works — do one dummy "reject" to warm up the extension
 - [ ] Close ALL other browser tabs, notifications, Slack, Discord — zero distractions
 - [ ] Set screen resolution to 1920×1080 or higher — no scrollbar surprises
@@ -133,13 +134,24 @@ When you send to it during the demo, the dual-layer UI will show the DAO boost.
 
 > "That's what soulbound means. Your identity is permanent. Your reputation is earned. And no one can take it away."
 
-**SHOW:** SBT tab — trust score circle animating, four colored bars with values, "View Raw On-Chain Token URI" expanded showing Base64 string, Technical Details visible below (ERC-721 Soulbound, `revert('SBTs cannot be transferred')`, On-chain Base64 JSON).
+[ACTION: Hit F12 / Ctrl+Shift+J to open DevTools Console — 20 seconds max]
 
-**WHY IT LANDS:** Three stacking punches:
+> "I'm going to open DevTools right now."
+
+[POINT AT the Console tab — log lines are already there from the SBT load]
+
+> "Every number you see on that card — Trust Score, Voting Accuracy, DAO Votes — has a corresponding `eth_call` logged right here with the contract address and the return value. See this line? `getTokenMetadata` — that's the contract read that produced the trust score circle. You can take that contract address, go to Monad Explorer right now, and verify every single number independently. That's what trustless actually means."
+
+[Close DevTools — move on. Don't linger.]
+
+**SHOW:** SBT tab — trust score circle animating, four colored bars with values, "View Raw On-Chain Token URI" expanded showing Base64 string, Technical Details visible below (ERC-721 Soulbound, `revert('SBTs cannot be transferred')`, On-chain Base64 JSON). DevTools Console briefly visible showing `[SBT] eth_call getTokenMetadata(...)` and `[SBT] eth_call tokenURI(...)` log lines.
+
+**WHY IT LANDS:** Four stacking punches:
 
 1. "Cannot be transferred" — judges immediately understand this is not a regular NFT
 2. The four bars with specific scores — it's not just identity, it's a _living reputation system_
 3. The raw Base64 blob — this is proof. Not a claim. Proof that the metadata is on-chain. Judges who understand Web3 will be floored — most NFTs use IPFS or centralized URIs that break. This never breaks.
+4. DevTools Console — the "Verifiable UI" moment. Every number on screen has a matching log line with the contract call that produced it. Judges who know what `eth_call` means will realize this cannot be faked. This is what separates NeuroShield from every other demo in the room.
 
 ---
 
@@ -398,7 +410,9 @@ Prepare for these. Rehearse the answers until they're reflex.
 
 **Q8: "This is a hackathon. How much of this actually works end-to-end versus being stitched together?"**
 
-> "Everything I showed you was a live transaction on a real chain, processed by a real ML API, recorded in a real smart contract. The report I submitted — you can look it up on the explorer right now. The vote I cast — same. The SBT trust score — reading directly from contract state. The flywheel — the Go event listener caught the confirmation in real-time. I have nothing to hide. Ask me to show any piece again."
+> "Open DevTools Console right now. Every contract call that produced every number on that screen is logged — function name, return value, contract address. Cross-reference any of them on Monad Explorer. I'll wait."
+
+[PAUSE — look at judges. Don't fill the silence. Let them decide if they want to challenge it. They won't.]
 
 ---
 
