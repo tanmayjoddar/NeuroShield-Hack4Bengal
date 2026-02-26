@@ -4,7 +4,7 @@ async function main() {
   const addr = "0x01CA6bB78503E8945Ff6D4f5B39DBA7915484606";
   const wv = await ethers.getContractAt(
     "WalletVerifier",
-    "0x78d8Ff95a4C4dc864AAD94932A39CcB4AcBDdD30"
+    "0x78d8Ff95a4C4dc864AAD94932A39CcB4AcBDdD30",
   );
 
   console.log("\n🔍 WalletVerifier.computeTrustScore(" + addr + ")");
@@ -21,4 +21,9 @@ async function main() {
   console.log("\nRaw balance:    ", ethers.formatEther(bal), "MON");
 }
 
-main().then(() => process.exit(0)).catch(e => { console.error(e); process.exit(1); });
+main()
+  .then(() => process.exit(0))
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });

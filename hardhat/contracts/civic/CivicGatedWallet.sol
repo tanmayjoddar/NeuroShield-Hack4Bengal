@@ -12,10 +12,10 @@ contract CivicGatedWallet {
     WalletVerifier public walletVerifier;
     uint256 public verificationThreshold;
     address public owner;
-    
+
     event TransactionExecuted(address indexed to, uint256 value, bool verified);
     event ThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);
-    
+
     /**
      * @dev Initializes the contract with WalletVerifier address and a threshold amount
      * @param _walletVerifierAddress The deployed WalletVerifier contract address
@@ -27,7 +27,7 @@ contract CivicGatedWallet {
         verificationThreshold = _threshold;
         owner = msg.sender;
     }
-    
+
     /**
      * @dev Modifier to restrict access to the owner
      */
@@ -35,7 +35,7 @@ contract CivicGatedWallet {
         require(msg.sender == owner, "CivicGatedWallet: Not owner");
         _;
     }
-    
+
     /**
      * @dev Updates the threshold amount for verification
      * @param _newThreshold New threshold amount
@@ -45,7 +45,7 @@ contract CivicGatedWallet {
         verificationThreshold = _newThreshold;
         emit ThresholdUpdated(oldThreshold, _newThreshold);
     }
-    
+
     /**
      * @dev Executes a transaction, requiring wallet verification for amounts above threshold.
      * Only the owner can execute transactions from this wallet.
@@ -56,9 +56,9 @@ contract CivicGatedWallet {
     function executeTransaction(address payable _to, uint256 _value) external onlyOwner returns (bool success) {
         require(_to != address(0), "CivicGatedWallet: Invalid recipient");
         require(address(this).balance >= _value, "CivicGatedWallet: Insufficient balance");
-        
+
         bool requiresVerification = _value >= verificationThreshold;
-        
+
         if (requiresVerification) {
             (uint256 trustScore, , , , ) = walletVerifier.computeTrustScore(msg.sender);
             require(
@@ -66,15 +66,15 @@ contract CivicGatedWallet {
                 "CivicGatedWallet: Wallet verification required for high-value transaction"
             );
         }
-        
+
         (success, ) = _to.call{value: _value}("");
         require(success, "CivicGatedWallet: Transaction failed");
-        
+
         emit TransactionExecuted(_to, _value, requiresVerification);
-        
+
         return success;
     }
-    
+
     /**
      * @dev Allows the contract to receive ETH
      */
