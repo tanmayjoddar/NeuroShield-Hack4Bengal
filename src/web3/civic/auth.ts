@@ -78,8 +78,18 @@ const QUADRATIC_VOTING_ADDRESS =
 // HELPER: Get contract instances
 // ════════════════════════════════════════════
 
+const MONAD_RPC = "https://testnet-rpc.monad.xyz";
+
+/**
+ * Get a provider for READ-ONLY on-chain calls.
+ * Always uses direct Monad RPC — does NOT depend on MetaMask.
+ */
 const getProvider = () => {
-  return walletConnector.provider || null;
+  try {
+    return new ethers.JsonRpcProvider(MONAD_RPC);
+  } catch {
+    return null;
+  }
 };
 
 const getQuadraticVotingContract = () => {

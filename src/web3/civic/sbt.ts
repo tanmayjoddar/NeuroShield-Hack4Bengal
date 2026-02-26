@@ -88,9 +88,12 @@ const QV_ADDRESS =
 // HELPERS
 // ════════════════════════════════════════════
 
-const getReadProvider = (): JsonRpcProvider | BrowserProvider | null => {
-  // Prefer the wallet provider for consistency, fall back to direct RPC
-  if (walletConnector.provider) return walletConnector.provider;
+/**
+ * Get a provider for READ-ONLY on-chain calls.
+ * Always uses the direct Monad RPC — does NOT depend on MetaMask being connected
+ * or being on the right chain. This ensures trust score reads always work.
+ */
+const getReadProvider = (): JsonRpcProvider | null => {
   try {
     return new JsonRpcProvider(MONAD_RPC);
   } catch {
