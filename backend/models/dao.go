@@ -38,4 +38,6 @@ type ConfirmedScam struct {
 	ConfirmedAt       time.Time `json:"confirmedAt"`
 	TotalVoters       int       `json:"totalVoters"`
 	Description       string    `json:"description"`
+	TxHash            string    `json:"txHash" gorm:"index"`          // On-chain tx hash from ProposalExecuted event
+	BlockNumber       uint64    `json:"blockNumber"`                  // Block where the proposal was executed
 }

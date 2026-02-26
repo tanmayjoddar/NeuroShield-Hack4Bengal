@@ -70,6 +70,17 @@ func main() {
 		log.Println("Telegram webhooks not set in development mode")
 	}
 
+	// Start on-chain event listener (QuadraticVoting → ConfirmedScam sync)
+	log.Println("Starting on-chain event listener...")
+	eventListener, err := services.NewEventListenerService(db)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize event listener: %v", err)
+		log.Println("Continuing without on-chain event sync — DAO data will not auto-update")
+	} else {
+		eventListener.Start()
+		defer eventListener.Stop()
+	}
+
 	// Setup router with services
 	log.Println("Setting up API routes...")
 	r := routes.SetupMainRouter(db, telegramService)
