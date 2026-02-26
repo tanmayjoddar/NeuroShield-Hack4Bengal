@@ -388,17 +388,6 @@ const Index = () => {
                 Reports
               </button>
               <button
-                onClick={() => setActiveTab("recovery")}
-                className={`flex items-center gap-2 px-3 py-2 transition-all duration-300 hover:scale-105 ${
-                  activeTab === "recovery"
-                    ? "text-cyan-400 font-medium scale-105"
-                    : "text-gray-400 hover:text-white hover:underline decoration-cyan-400/50 underline-offset-4"
-                }`}
-              >
-                <Key className="h-5 w-5" />
-                Recovery
-              </button>
-              <button
                 onClick={() => setActiveTab("sbt")}
                 className={`flex items-center gap-2 px-3 py-2 transition-all duration-300 hover:scale-105 ${
                   activeTab === "sbt"
