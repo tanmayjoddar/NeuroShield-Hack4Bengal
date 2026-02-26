@@ -56,6 +56,13 @@ func SetupMainRouter(db *gorm.DB, telegramService *services.TelegramService) *gi
 
 	aiService := services.NewAIServiceWithDB(analyticsService, db)
 
+	// Initialize SBT service
+	sbtService, sbtErr := services.NewSBTService(db)
+	if sbtErr != nil {
+		log.Printf("Warning: Failed to initialize SBT service: %v", sbtErr)
+		log.Println("SBT endpoints will return 503. Set CIVIC_SBT_ADDRESS and CIVIC_VERIFIER_ADDRESS.")
+	}
+
 	// Initialize Civic Auth service
 	civicConfig := &services.CivicConfig{
 		GatekeeperNetwork: os.Getenv("CIVIC_GATEKEEPER_NETWORK"),
@@ -73,6 +80,12 @@ func SetupMainRouter(db *gorm.DB, telegramService *services.TelegramService) *gi
 	daoHandler := handlers.NewDAOHandler(db, blockchainService)
 	authHandler := handlers.NewAuthHandler(blockchainService)
 	analyticsHandler := handlers.NewWalletAnalyticsHandler(analyticsService)
+
+	// Initialize SBT handler (may be nil if SBT service failed)
+	var sbtHandler *handlers.SBTHandler
+	if sbtService != nil {
+		sbtHandler = handlers.NewSBTHandler(sbtService)
+	}
 
 	// Apply rate limiting to all API routes
 	r.Use(middleware.RateLimitMiddleware())
@@ -103,6 +116,20 @@ func SetupMainRouter(db *gorm.DB, telegramService *services.TelegramService) *gi
 		api.GET("/analytics/risk/:address", analyticsHandler.GetWalletRiskScore)
 		api.POST("/analytics/bulk", analyticsHandler.GetBulkWalletAnalytics)
 		api.POST("/analytics/export", analyticsHandler.ExportMLDataset)
+
+		// SBT (Soulbound Token) endpoints
+		if sbtHandler != nil {
+			sbt := api.Group("/sbt")
+			{
+				sbt.GET("/profile/:address", sbtHandler.GetSBTProfile)
+				sbt.GET("/trust/:address", sbtHandler.GetTrustBreakdown)
+				sbt.GET("/check/:address", sbtHandler.CheckSBTStatus)
+				sbt.POST("/sync/:address", sbtHandler.SyncSBT)
+				sbt.GET("/leaderboard", sbtHandler.GetLeaderboard)
+				sbt.GET("/stats", sbtHandler.GetSBTStats)
+				sbt.GET("/export", sbtHandler.ExportSBTData)
+			}
+		}
 	}
 
 	// Create a new protected group that requires both Web3 and Civic Auth

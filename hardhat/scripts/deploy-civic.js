@@ -1,6 +1,8 @@
 // Script to deploy Civic integration contracts
 
 const { ethers } = require("hardhat");
+const fs = require("fs");
+const path = require("path");
 
 async function main() {
   console.log("Deploying Civic integration contracts...");
@@ -56,6 +58,28 @@ async function main() {
   console.log(
     "\nSet VITE_CIVIC_VERIFIER_ADDRESS=" + civicVerifierAddr + " in your .env",
   );
+
+  // Save addresses to src/web3/addresses.json
+  const addressesPath = path.join(__dirname, "../../src/web3/addresses.json");
+  let addresses = {};
+  try {
+    addresses = JSON.parse(fs.readFileSync(addressesPath, "utf8"));
+  } catch (e) {
+    // File doesn't exist yet
+  }
+  addresses.civicSBT = civicSBTAddr;
+  addresses.civicVerifier = civicVerifierAddr;
+  addresses.civicGatedWallet = civicGatedWalletAddr;
+  addresses.mockCivicPass = mockCivicPassAddr;
+  fs.writeFileSync(addressesPath, JSON.stringify(addresses, null, 2));
+  console.log(`\nAddresses saved to ${addressesPath}`);
+
+  // Generate .env snippet
+  console.log("\n📋 Add to your .env:");
+  console.log(`VITE_CIVIC_SBT_ADDRESS=${civicSBTAddr}`);
+  console.log(`VITE_CIVIC_VERIFIER_ADDRESS=${civicVerifierAddr}`);
+  console.log(`CIVIC_SBT_ADDRESS=${civicSBTAddr}`);
+  console.log(`CIVIC_VERIFIER_ADDRESS=${civicVerifierAddr}`);
 }
 
 main()

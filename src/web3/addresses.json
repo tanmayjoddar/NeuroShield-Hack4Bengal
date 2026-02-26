@@ -1,3 +1,8 @@
 {
-  "socialRecoveryWallet": "0xcdc4284A037f8b7C5a6c03b3f190A1B83d0258e2"
+  "socialRecoveryWallet": "0xcdc4284A037f8b7C5a6c03b3f190A1B83d0258e2",
+  "quadraticVoting": "0x7A791FE5A35131B7D98F854A64e7F94180F27C7B",
+  "civicSBT": "",
+  "civicVerifier": "",
+  "civicGatedWallet": "",
+  "mockCivicPass": ""
 }

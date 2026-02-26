@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import SendPage from "./pages/SendPage";
 import RegisterPage from "@/pages/RegisterPage";
+import SBTPage from "@/pages/SBTPage";
 
 const queryClient = new QueryClient();
 
@@ -20,6 +21,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/send" element={<SendPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/sbt" element={<SBTPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

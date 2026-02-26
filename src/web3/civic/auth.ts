@@ -2,8 +2,13 @@
 // Connects to on-chain CivicVerifier + QuadraticVoting contracts for real verification
 // Falls back to local heuristics when contracts unavailable
 
-import { ethers } from 'ethers';
-import walletConnector from '../wallet';
+import { ethers } from "ethers";
+import walletConnector from "../wallet";
+import {
+  getOnChainMetadata,
+  decomposeOnChainTrustScore,
+  type SBTMetadata,
+} from "./sbt";
 
 // ════════════════════════════════════════════
 // TYPES
@@ -27,7 +32,7 @@ interface CivicProfile {
 
 interface TrustScoreData {
   score: number; // 0-100
-  level: 'High' | 'Medium' | 'Low';
+  level: "High" | "Medium" | "Low";
   factors: {
     civicVerified: boolean;
     transactionHistory: {
@@ -60,8 +65,9 @@ const QUADRATIC_VOTING_ABI = [
 ];
 
 // Contract addresses (loaded from env or defaults for Monad testnet)
-const CIVIC_VERIFIER_ADDRESS = import.meta.env.VITE_CIVIC_VERIFIER_ADDRESS || '';
-const QUADRATIC_VOTING_ADDRESS = '0x7A791FE5A35131B7D98F854A64e7F94180F27C7B';
+const CIVIC_VERIFIER_ADDRESS =
+  import.meta.env.VITE_CIVIC_VERIFIER_ADDRESS || "";
+const QUADRATIC_VOTING_ADDRESS = "0x7A791FE5A35131B7D98F854A64e7F94180F27C7B";
 
 // ════════════════════════════════════════════
 // HELPER: Get contract instances
@@ -75,7 +81,11 @@ const getQuadraticVotingContract = () => {
   const provider = getProvider();
   if (!provider) return null;
   try {
-    return new ethers.Contract(QUADRATIC_VOTING_ADDRESS, QUADRATIC_VOTING_ABI, provider);
+    return new ethers.Contract(
+      QUADRATIC_VOTING_ADDRESS,
+      QUADRATIC_VOTING_ABI,
+      provider,
+    );
   } catch {
     return null;
   }
@@ -85,7 +95,11 @@ const getCivicVerifierContract = () => {
   const provider = getProvider();
   if (!provider || !CIVIC_VERIFIER_ADDRESS) return null;
   try {
-    return new ethers.Contract(CIVIC_VERIFIER_ADDRESS, CIVIC_VERIFIER_ABI, provider);
+    return new ethers.Contract(
+      CIVIC_VERIFIER_ADDRESS,
+      CIVIC_VERIFIER_ABI,
+      provider,
+    );
   } catch {
     return null;
   }
@@ -95,14 +109,14 @@ const getCivicVerifierContract = () => {
 // LOCAL VERIFICATION CACHE
 // ════════════════════════════════════════════
 
-const VERIFICATION_CACHE_KEY = 'neuroshield_civic_cache';
+const VERIFICATION_CACHE_KEY = "neuroshield_civic_cache";
 
 interface CachedVerification {
   address: string;
   isVerified: boolean;
   verificationLevel: number;
   timestamp: number;
-  source: 'contract' | 'local';
+  source: "contract" | "local";
 }
 
 const getCachedVerification = (address: string): CachedVerification | null => {
@@ -137,11 +151,13 @@ const setCachedVerification = (data: CachedVerification) => {
  * @param address User's wallet address
  * @returns Verification result
  */
-export const verifyCivicIdentity = async (address: string): Promise<{
+export const verifyCivicIdentity = async (
+  address: string,
+): Promise<{
   isVerified: boolean;
   verificationLevel?: number;
   expiry?: number;
-  source: 'contract' | 'local';
+  source: "contract" | "local";
 }> => {
   try {
     // Try on-chain verification first
@@ -149,12 +165,12 @@ export const verifyCivicIdentity = async (address: string): Promise<{
     if (civicContract) {
       const isVerified = await civicContract.isVerified(address);
       const level = await civicContract.getVerificationLevel(address);
-      
+
       const result = {
         isVerified: Boolean(isVerified),
         verificationLevel: Number(level),
         expiry: isVerified ? Date.now() + 86400000 : undefined,
-        source: 'contract' as const,
+        source: "contract" as const,
       };
 
       // Cache the result
@@ -163,7 +179,7 @@ export const verifyCivicIdentity = async (address: string): Promise<{
         isVerified: result.isVerified,
         verificationLevel: result.verificationLevel || 0,
         timestamp: Date.now(),
-        source: 'contract',
+        source: "contract",
       });
 
       return result;
@@ -176,7 +192,7 @@ export const verifyCivicIdentity = async (address: string): Promise<{
         isVerified: cached.isVerified,
         verificationLevel: cached.verificationLevel,
         expiry: cached.timestamp + 86400000,
-        source: 'local',
+        source: "local",
       };
     }
 
@@ -186,21 +202,21 @@ export const verifyCivicIdentity = async (address: string): Promise<{
       try {
         const stats = await qvContract.getVoterStats(address);
         const participation = Number(stats.participation || 0);
-        
+
         if (participation > 0) {
           // Active DAO participant = implicitly verified
           const result = {
             isVerified: true,
             verificationLevel: participation >= 5 ? 2 : 1,
             expiry: Date.now() + 86400000,
-            source: 'local' as const,
+            source: "local" as const,
           };
           setCachedVerification({
             address,
             isVerified: true,
             verificationLevel: result.verificationLevel,
             timestamp: Date.now(),
-            source: 'local',
+            source: "local",
           });
           return result;
         }
@@ -212,13 +228,13 @@ export const verifyCivicIdentity = async (address: string): Promise<{
     // Default: not verified
     return {
       isVerified: false,
-      source: 'local',
+      source: "local",
     };
   } catch (error) {
-    console.error('Civic verification failed:', error);
+    console.error("Civic verification failed:", error);
     return {
       isVerified: false,
-      source: 'local',
+      source: "local",
     };
   }
 };
@@ -232,11 +248,11 @@ export const initializeCivicAuth = async () => {
     return {
       signIn: async () => {
         if (!walletConnector.address) {
-          throw new Error('Wallet not connected');
+          throw new Error("Wallet not connected");
         }
         const verification = await verifyCivicIdentity(walletConnector.address);
         return {
-          status: verification.isVerified ? 'success' : 'failed',
+          status: verification.isVerified ? "success" : "failed",
           data: {
             wallet: {
               address: walletConnector.address,
@@ -251,7 +267,7 @@ export const initializeCivicAuth = async () => {
       },
     };
   } catch (error) {
-    console.error('Failed to initialize Civic Auth client:', error);
+    console.error("Failed to initialize Civic Auth client:", error);
     throw error;
   }
 };
@@ -263,18 +279,21 @@ export const createCivicWallet = async () => {
   try {
     const authClient = await initializeCivicAuth();
     const response = await authClient.signIn();
-    
-    if (response.status === 'success') {
+
+    if (response.status === "success") {
       return {
         success: true,
         wallet: response.data.wallet,
         user: response.data.user,
       };
     }
-    return { success: false, error: 'Verification failed' };
+    return { success: false, error: "Verification failed" };
   } catch (error) {
-    console.error('Failed to create Civic wallet:', error);
-    return { success: false, error: 'An error occurred during wallet creation' };
+    console.error("Failed to create Civic wallet:", error);
+    return {
+      success: false,
+      error: "An error occurred during wallet creation",
+    };
   }
 };
 
@@ -284,9 +303,11 @@ export const createCivicWallet = async () => {
  * @param address User wallet address
  * @returns Civic profile data
  */
-export const getCivicProfile = async (address: string): Promise<CivicProfile> => {
+export const getCivicProfile = async (
+  address: string,
+): Promise<CivicProfile> => {
   const verification = await verifyCivicIdentity(address);
-  const shortAddr = address.slice(0, 6) + '...' + address.slice(-4);
+  const shortAddr = address.slice(0, 6) + "..." + address.slice(-4);
 
   // Try to get on-chain data
   let daoStats = { accuracy: 0, participation: 0 };
@@ -304,29 +325,75 @@ export const getCivicProfile = async (address: string): Promise<CivicProfile> =>
   }
 
   const levelMap: Record<number, string> = {
-    0: 'Unverified',
-    1: 'Basic',
-    2: 'Advanced',
-    3: 'Premium',
+    0: "Unverified",
+    1: "Basic",
+    2: "Advanced",
+    3: "Premium",
   };
 
   return {
     id: `civic-${address.slice(2, 10)}`,
     name: `NeuroShield User ${shortAddr}`,
     avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${address}`,
-    verificationLevel: levelMap[verification.verificationLevel || 0] || 'Basic',
+    verificationLevel: levelMap[verification.verificationLevel || 0] || "Basic",
     verified: verification.isVerified,
     joinedDate: new Date(),
   };
 };
 
 /**
- * Calculate trust score based on Civic verification + on-chain DAO activity.
- * This is the real trust score, not mock data.
+ * Calculate trust score based on on-chain SBT data (preferred) or live contract reads (fallback).
+ *
+ * Priority:
+ *   1. Read from CivicSBT.getTokenMetadata() — already stored on-chain by the SBT
+ *   2. If no SBT exists, compute live from CivicVerifier + QuadraticVoting + provider
+ *
+ * Formula (same in both paths):
+ *   +40  Are you a verified human? (Civic)
+ *   +20  Do you have transaction history?
+ *   +20  Do you vote correctly in the DAO?
+ *   +20  Do you actually participate?
+ *   ────
+ *   100  Permanent on-chain reputation
+ *
  * @param address User wallet address
  * @returns Trust score data
  */
-export const calculateTrustScore = async (address: string): Promise<TrustScoreData> => {
+export const calculateTrustScore = async (
+  address: string,
+): Promise<TrustScoreData> => {
+  // ── Path 1: Read trust score from on-chain SBT (authoritative, fastest) ──
+  try {
+    const sbtMetadata: SBTMetadata | null = await getOnChainMetadata(address);
+    if (sbtMetadata) {
+      const breakdown = decomposeOnChainTrustScore(sbtMetadata);
+      const finalScore = Math.min(100, breakdown.total);
+      let level: "High" | "Medium" | "Low";
+      if (finalScore >= 70) level = "High";
+      else if (finalScore >= 40) level = "Medium";
+      else level = "Low";
+
+      return {
+        score: finalScore,
+        level,
+        factors: {
+          civicVerified: sbtMetadata.verificationLevel > 0,
+          transactionHistory: {
+            totalCount: 0, // SBT doesn't store tx count, but trust score already accounts for it
+            successRate: finalScore > 0 ? 0.95 : 0,
+          },
+          daoActivity: {
+            votingAccuracy: sbtMetadata.votingAccuracy,
+            participation: sbtMetadata.doiParticipation,
+          },
+        },
+      };
+    }
+  } catch {
+    // SBT not available — fall through to live computation
+  }
+
+  // ── Path 2: Compute live from contracts (no SBT minted yet) ──
   const verification = await verifyCivicIdentity(address);
   const isVerified = verification.isVerified;
 
@@ -375,10 +442,10 @@ export const calculateTrustScore = async (address: string): Promise<TrustScoreDa
 
   const finalScore = Math.min(100, baseScore);
 
-  let level: 'High' | 'Medium' | 'Low';
-  if (finalScore >= 70) level = 'High';
-  else if (finalScore >= 40) level = 'Medium';
-  else level = 'Low';
+  let level: "High" | "Medium" | "Low";
+  if (finalScore >= 70) level = "High";
+  else if (finalScore >= 40) level = "Medium";
+  else level = "Low";
 
   return {
     score: finalScore,
@@ -387,7 +454,7 @@ export const calculateTrustScore = async (address: string): Promise<TrustScoreDa
       civicVerified: isVerified,
       transactionHistory: {
         totalCount: txCount,
-        successRate: txCount > 0 ? 0.95 : 0, // Approximate
+        successRate: txCount > 0 ? 0.95 : 0,
       },
       daoActivity,
     },
