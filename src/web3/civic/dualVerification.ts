@@ -1,10 +1,10 @@
 /**
  * Dual-Layer AI + Community Defense System
  * ═══════════════════════════════════════════
- * 
+ *
  * Layer 1 (Instant): ML model analyzes transaction features in real-time
  * Layer 2 (Long-term): DAO community curates scam database via quadratic voting
- * 
+ *
  * THE FLYWHEEL:
  *   1. ML flags suspicious transaction → user warned immediately
  *   2. If user proceeds, transaction is logged for community review
@@ -12,7 +12,7 @@
  *   4. DAO-confirmed scams are added to on-chain scam database
  *   5. On-chain scam data feeds BACK into ML scoring (dual-layer boost)
  *   6. ML becomes more accurate over time → better warnings → cycle repeats
- * 
+ *
  * This creates a self-improving defense system that gets stronger with use.
  */
 
@@ -60,11 +60,11 @@ interface DualLayerResult {
   combinedRiskScore: number;  // 0-100 (weighted combination)
   combinedSafe: boolean;
   riskLevel: 'critical' | 'high' | 'medium' | 'low' | 'safe';
-  
+
   // User-facing
   recommendation: string;
   warnings: string[];
-  
+
   // Flywheel metadata
   shouldFlagForDAO: boolean;  // Whether this tx should be submitted for DAO review
   confidenceBoost: number;    // Extra confidence from dual-layer agreement
@@ -203,7 +203,7 @@ const queryDAOScamDatabase = async (address: string): Promise<DAOResult> => {
     const scamScore = await contractService.getScamScore(address);
 
     let communityVerdict: DAOResult['communityVerdict'] = 'unknown';
-    
+
     if (isKnownScam) {
       communityVerdict = 'confirmed_scam';
     } else if (scamScore > 0) {
@@ -217,7 +217,7 @@ const queryDAOScamDatabase = async (address: string): Promise<DAOResult> => {
       activeProposals = reports.filter(
         (r: any) => r.suspiciousAddress?.toLowerCase() === address.toLowerCase() && r.status === 'active'
       ).length;
-      
+
       if (activeProposals > 0) {
         communityVerdict = 'under_review';
       }
@@ -249,13 +249,13 @@ const queryDAOScamDatabase = async (address: string): Promise<DAOResult> => {
 /**
  * Main dual-layer verification function.
  * Combines ML instant detection + DAO community curation + Civic identity.
- * 
+ *
  * The flywheel logic:
  *   - If BOTH ML and DAO agree → high confidence
  *   - If they disagree → flag for community review
  *   - DAO-confirmed scams ALWAYS override ML "safe" verdict
  *   - Civic-verified senders get slight trust boost
- * 
+ *
  * @param address Sender's wallet address
  * @param transaction Transaction details to analyze
  * @returns Combined dual-layer assessment
@@ -350,8 +350,8 @@ export const dualVerification = async (
     // ════════════════════════════════════════════
 
     // Flag for DAO review if ML flagged it but community hasn't reviewed yet
-    const shouldFlagForDAO = 
-      mlResult.riskScore > 50 && 
+    const shouldFlagForDAO =
+      mlResult.riskScore > 50 &&
       daoResult.communityVerdict === 'unknown' &&
       daoResult.activeProposals === 0;
 
