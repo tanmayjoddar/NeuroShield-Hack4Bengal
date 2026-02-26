@@ -99,24 +99,25 @@ When you send to it during the demo, the dual-layer UI will show the DAO boost.
 
 [POINT AT the SBT card header: "Permanent on-chain reputation — impossible to transfer, impossible to fake"]
 
-> "A Soulbound Token. An ERC-721 NFT that is physically impossible to transfer. If you try to send it, the contract literally reverts with the message: 'SBTs cannot be transferred.' You cannot buy one. You cannot sell one. You cannot steal one. It is permanently, irrevocably, permanently bound to your wallet address forever."
+> "A Soulbound Token. An NFT that is physically impossible to transfer. If you try to send it, the contract literally reverts: 'SBTs cannot be transferred.' You cannot buy one. You cannot sell one. You cannot steal one. It is permanently bound to your wallet address forever."
 
-[PAUSE — let the word "forever" land]
+[PAUSE — let "forever" land]
 
 [POINT AT the Trust Score circle — the animated SVG ring with the number in the center]
 
-> "And look at what it stores — your trust score. A single number out of a hundred. But it's not an arbitrary number. Watch."
+> "And look at what it stores — your trust score. A single number out of a hundred. But here's what makes it different from every reputation system you've ever seen: **no human being assigned this number. No server computed it. The smart contract itself reads the blockchain and calculates it live.**"
 
-[POINT AT the four colored breakdown bars, one by one — go slow]
+[POINT AT the three colored breakdown bars, one by one — go slow]
 
-> "Purple bar — are you a verified human? That's forty points. The single biggest factor.
-> Blue bar — do you have real transaction history on this chain? Plus twenty.
-> Green bar — when you vote in the DAO on scam reports, do you vote _correctly_? Plus twenty. Get it wrong, this drops.
-> Gold bar — do you actually show up and vote? Plus twenty. Lurkers score zero."
+> "First bar — **Wallet History**. Forty points. The contract reads your actual MON balance right now, on-chain. More than five MON? Full forty. Just arrived with dust? Nearly zero. This is not a profile field you fill in — it's your wallet's real financial footprint, read by the contract at mint time."
 
-[PAUSE]
+> "Second bar — **DAO Voting Accuracy**. Thirty points. When you vote on scam reports, were you right? The contract queries the QuadraticVoting contract's `voterAccuracy()` function — which tracks your correct votes versus total votes. Get it wrong? This drops. You can't fake accuracy."
 
-> "One hundred points. Four dimensions. Every single one of them is independently verifiable from on-chain state. Nobody assigned these scores. Nobody can change them. They're computed live from the blockchain."
+> "Third bar — **DAO Participation**. Thirty points. Do you actually show up and vote? The contract calls `voterParticipation()` — your votes versus total proposals. Lurkers score zero. Active voters earn reputation."
+
+[PAUSE — this is the key line]
+
+> "One hundred points. Three dimensions. Zero human input. The WalletVerifier contract reads your balance and your DAO track record, computes the score in a single `computeTrustScore()` call, and writes it into your SBT. **The entire reputation is computed on-chain, from on-chain data, by on-chain code.** There is no backend. There is no API. There is no admin."
 
 [CLICK "View Raw On-Chain Token URI" → show the Base64 string expanding]
 
@@ -144,14 +145,14 @@ When you send to it during the demo, the dual-layer UI will show the DAO boost.
 
 [Close DevTools — move on. Don't linger.]
 
-**SHOW:** SBT tab — trust score circle animating, four colored bars with values, "View Raw On-Chain Token URI" expanded showing Base64 string, Technical Details visible below (ERC-721 Soulbound, `revert('SBTs cannot be transferred')`, On-chain Base64 JSON). DevTools Console briefly visible showing `[SBT] eth_call getTokenMetadata(...)` and `[SBT] eth_call tokenURI(...)` log lines.
+**SHOW:** SBT tab — trust score circle animating, three colored bars with values (Wallet History /40, DAO Voting Accuracy /30, DAO Participation /30), "View Raw On-Chain Token URI" expanded showing Base64 string. DevTools Console briefly visible showing `[SBT] eth_call computeTrustScore(...)`, `[SBT] eth_call tokenURI(...)` log lines with contract address `0x78d8Ff95a4C4dc864AAD94932A39CcB4AcBDdD30`.
 
 **WHY IT LANDS:** Four stacking punches:
 
 1. "Cannot be transferred" — judges immediately understand this is not a regular NFT
-2. The four bars with specific scores — it's not just identity, it's a _living reputation system_
-3. The raw Base64 blob — this is proof. Not a claim. Proof that the metadata is on-chain. Judges who understand Web3 will be floored — most NFTs use IPFS or centralized URIs that break. This never breaks.
-4. DevTools Console — the "Verifiable UI" moment. Every number on screen has a matching log line with the contract call that produced it. Judges who know what `eth_call` means will realize this cannot be faked. This is what separates NeuroShield from every other demo in the room.
+2. **Three bars, zero human input** — the WalletVerifier contract reads your balance and DAO track record from the blockchain itself. No oracle. No API. No admin dashboard. The score IS the chain state. This is the mind-boggling moment — judges realize no one can manipulate this score because no one inputs it.
+3. The raw Base64 blob — proof, not a claim. The metadata is stored inside the contract. If every server on earth goes offline, your reputation still exists. Most NFTs use IPFS URIs that break. This never breaks.
+4. DevTools Console — the "Verifiable UI" moment. Every number on screen has a matching `eth_call` log with the contract address and return value. Cross-reference on Monad Explorer. This cannot be faked.
 
 ---
 
@@ -261,7 +262,7 @@ When you send to it during the demo, the dual-layer UI will show the DAO boost.
 
 [PAUSE — now drop the callback]
 
-> "And remember that Soulbound Token from two minutes ago? The gold bar — DAO Participation? It was low. It just went up. The green bar — Voting Accuracy? When this proposal resolves, if I voted correctly, that goes up too."
+> "And remember that Soulbound Token from two minutes ago? The Participation bar — thirty points max? It just went up. The Voting Accuracy bar? When this proposal resolves, if I voted correctly, that goes up too. The WalletVerifier contract re-reads the DAO data on every SBT refresh."
 
 [PAUSE — let them connect the dots]
 
@@ -341,7 +342,7 @@ The visual difference is unmistakable — the DAO row goes from gray "+0%" to re
 
 > "Confirmed. Flywheel fires. AI gets smarter."
 
-> "Reporter's reputation upgraded on-chain — in a Soulbound Token that can never be bought, sold, faked, or taken down."
+> "Reporter's reputation upgraded on-chain — computed by a smart contract that reads the blockchain itself. Stored in a Soulbound Token that can never be bought, sold, faked, or taken down."
 
 [PAUSE — 2 seconds]
 
@@ -374,7 +375,7 @@ Prepare for these. Rehearse the answers until they're reflex.
 
 **Q2: "Are the smart contracts actually deployed or is this just a frontend mock?"**
 
-> "Deployed on Monad Testnet. QuadraticVoting at `0x7A791fe5...27C7b`. You just watched me submit two real MetaMask transactions — the report and the vote. Open Monad Explorer right now and you'll see both tx hashes in the contract's history."
+> "Six contracts deployed on Monad Testnet. WalletVerifier at `0x78d8Ff...dD30`, CivicSBT at `0xc5A1E1...ADcB`, QuadraticVoting at `0xC9755c...1846`. You just watched me submit real MetaMask transactions — open Monad Explorer right now and you'll see every tx hash in the contract history."
 
 ---
 
@@ -386,7 +387,7 @@ Prepare for these. Rehearse the answers until they're reflex.
 
 **Q4: "Quadratic voting sounds nice but how do you prevent one person creating multiple wallets to game the system?"**
 
-> "Two layers. First, SBT trust scores — new wallets with zero history, zero participation get minimal voting weight. Second, the architecture supports Civic biometric verification, which links one real human face to one SBT. One identity, one voice. The Sybil attack surface is minimized at both the reputation and identity layers."
+> "The WalletVerifier contract reads your real wallet balance and your actual DAO voting history — both immutable on-chain facts. A fresh Sybil wallet has zero balance, zero participation, zero accuracy — its trust score is nearly zero, so its vote carries almost no weight. You'd need to fund dozens of wallets with real MON AND build a genuine voting track record on each one over time. The cost of Sybil attack scales with real economic commitment, not just wallet creation."
 
 ---
 
@@ -426,16 +427,16 @@ If a judge asks "sum this up in one sentence," say:
 
 ## TIMING SUMMARY
 
-| Act            | Time       | Duration | What Happens                                              |
-| -------------- | ---------- | -------- | --------------------------------------------------------- |
-| 1 — Hook       | 0:00–0:30  | 30s      | The $5.6B line. Ronin address revealed.                   |
-| 2 — SBT        | 0:30–2:00  | 90s      | Connect wallet. SBT trust circle, 4 bars, raw Base64 URI. |
-| 3 — AI Scanner | 2:00–3:15  | 75s      | Send to Ronin address. ML=85%, DAO=+0%. Cancel.           |
-| 4 — Report     | 3:15–4:15  | 60s      | Submit on-chain report. Real MetaMask tx.                 |
-| 5 — DAO Vote   | 4:15–5:15  | 60s      | Quadratic voting. Cast vote. SBT callback moment.         |
-| 6 — Flywheel   | 5:15–6:15  | 60s      | Same address again. DAO=+10%. Combined 85→95. MOMENT.     |
-| 7 — Close      | 6:15–6:45  | 30s      | The immune system line. SBT. Silence.                     |
-| Q&A            | 6:45–7:00+ | 15s+     | First question response.                                  |
+| Act            | Time       | Duration | What Happens                                                         |
+| -------------- | ---------- | -------- | -------------------------------------------------------------------- |
+| 1 — Hook       | 0:00–0:30  | 30s      | The $5.6B line. Ronin address revealed.                              |
+| 2 — SBT        | 0:30–2:00  | 90s      | Connect wallet. SBT trust circle, 3 bars (40/30/30), raw Base64 URI. |
+| 3 — AI Scanner | 2:00–3:15  | 75s      | Send to Ronin address. ML=85%, DAO=+0%. Cancel.                      |
+| 4 — Report     | 3:15–4:15  | 60s      | Submit on-chain report. Real MetaMask tx.                            |
+| 5 — DAO Vote   | 4:15–5:15  | 60s      | Quadratic voting. Cast vote. SBT callback moment.                    |
+| 6 — Flywheel   | 5:15–6:15  | 60s      | Same address again. DAO=+10%. Combined 85→95. MOMENT.                |
+| 7 — Close      | 6:15–6:45  | 30s      | The immune system line. SBT. Silence.                                |
+| Q&A            | 6:45–7:00+ | 15s+     | First question response.                                             |
 
 **Total: 6:30 + Q&A buffer = under 7:00**
 
