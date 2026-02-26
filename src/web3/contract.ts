@@ -17,10 +17,10 @@ interface VoteCastEventArgs extends Result {
 // Imports
 import { Contract, formatUnits, parseUnits, ethers } from 'ethers';
 import walletConnector from './wallet';
-import UnhackableWalletABI from './abi/UnhackableWallet.json';
 import { shortenAddress, isValidAddress } from './utils';
 import EventEmitter from 'events';
 import type { Result } from 'ethers';
+import addresses from './addresses.json';
 
 // ABI for the QuadraticVoting contract
 const QUADRATIC_VOTING_ABI = [
@@ -68,7 +68,7 @@ class ContractService extends EventEmitter {
   private contractInstance: Contract | null = null;
 
   private QUADRATIC_VOTING_ADDRESS = '0x7A791FE5A35131B7D98F854A64e7F94180F27C7B'; // Monad address
-  private SHIELD_TOKEN_ADDRESS = '0x0000000000000000000000000000000000000000';     // No shield token for now
+  private SHIELD_TOKEN_ADDRESS = (addresses as any).shieldToken || import.meta.env.VITE_SHIELD_TOKEN_ADDRESS || '0x0000000000000000000000000000000000000000';
   
   private votingContract: ethers.Contract | null = null;
   private shieldToken: ethers.Contract | null = null;
@@ -190,7 +190,7 @@ class ContractService extends EventEmitter {
       );
 
       // Verify the contract exists on the network by calling a view function
-      await this.contractInstance.getReportCount();
+      await this.contractInstance.proposalCount();
 
       return this.contractInstance;
     } catch (error: any) {
@@ -221,8 +221,8 @@ class ContractService extends EventEmitter {
     try {
       const contract = await this.getContract();
 
-      // Try to call a view functions to verify the contract
-      await contract.getReportCount();
+      // Try to call a view function to verify the contract
+      await contract.proposalCount();
 
       // If we got here, the contract is valid
       return true;
@@ -242,7 +242,8 @@ class ContractService extends EventEmitter {
    */
   async voteOnScamReport(
     proposalId: string,
-    inSupport: boolean
+    inSupport: boolean,
+    tokens: string = '1000000000000000000' // Default: 1 SHIELD token (in wei)
   ): Promise<any> {
     try {
       // Check wallet connection
@@ -250,11 +251,19 @@ class ContractService extends EventEmitter {
         throw new Error('Wallet not connected');
       }
 
-      const contract = await this.getContract();
+      // Use the quadratic voting castVote which requires token staking
+      console.log(`Casting quadratic vote on proposal ${proposalId}, support: ${inSupport}, tokens: ${tokens}`);
+      
+      // Ensure SHIELD token approval first
+      const needsApproval = await this.needsShieldApproval(tokens);
+      if (needsApproval) {
+        console.log('Approving SHIELD tokens for voting contract...');
+        const approveTx = await this.approveShield(tokens);
+        await approveTx.wait(1);
+        console.log('SHIELD tokens approved');
+      }
 
-      console.log(`Voting on report with proposalId: ${proposalId}, inSupport: ${inSupport}`);
-      const tx = await contract.voteOnReport(proposalId, inSupport);
-
+      const tx = await this.castQuadraticVote(proposalId, inSupport, tokens);
       return tx;
     } catch (error: any) {
       console.error('Vote error:', error);
@@ -274,7 +283,7 @@ class ContractService extends EventEmitter {
       }
 
       const contract = await this.getContract();
-      const isConfirmedScammer = await contract.confirmedScammers(address);
+      const isConfirmedScammer = await contract.isScammer(address);
 
       return isConfirmedScammer;
     } catch (error: any) {
@@ -316,28 +325,10 @@ class ContractService extends EventEmitter {
    * @returns {Promise<any[]>} List of scam reports
    */
   async getLegacyScamReports(): Promise<any[]> {
+    // Legacy method — redirects to QuadraticVoting-based reports
+    // The old UnhackableWallet getReportCount/getReport functions are not in QuadraticVoting
     try {
-      const contract = await this.getContract();
-
-      const reportCount = await contract.getReportCount();
-      const reports = [];
-
-      for (let i = 0; i < reportCount.toNumber(); i++) {
-        const report = await contract.getReport(i);
-        reports.push({
-          id: i,
-          reporter: report.reporter,
-          suspiciousAddress: report.suspiciousAddress,
-          description: report.description, // This matches with 'reason' in the contract
-          evidence: report.evidence,
-          timestamp: new Date(Number(report.timestamp) * 1000),
-          votesFor: Number(report.votesFor),
-          votesAgainst: Number(report.votesAgainst),
-          confirmed: report.confirmed
-        });
-      }
-
-      return reports;
+      return await this.getScamReports();
     } catch (error: any) {
       console.error('Get reports error:', error);
       return [];
@@ -390,12 +381,25 @@ class ContractService extends EventEmitter {
       const amountWei = parseUnits(amount, 18);
       console.log(`Sending ${amount} ETH to ${shortenAddress(to)}`);
 
-      const tx = await contract.secureTransfer(to, {
+      // Use direct signer transfer (QuadraticVoting contract doesn't have secureTransfer)
+      // First check if recipient is a known scammer
+      let isSafe = true;
+      try {
+        isSafe = !(await this.isScamAddress(to));
+      } catch (_) { /* continue even if check fails */ }
+
+      if (!isSafe) {
+        console.warn(`⚠️ WARNING: Recipient ${shortenAddress(to)} is a DAO-confirmed scammer!`);
+      }
+
+      const tx = await walletConnector.signer!.sendTransaction({
+        to,
         value: amountWei
       });
 
       return tx;
-    } catch (error: any) {      console.error('Secure send error:', error);
+    } catch (error: any) {
+      console.error('Secure send error:', error);
       // Check if user rejected the transaction
       if (error.code === 4001 || error.message?.includes('user rejected')) {
         throw new Error('Transaction cancelled by user');
@@ -593,11 +597,15 @@ class ContractService extends EventEmitter {
       if (addressReports.length === 0) return 0;
 
       // Calculate weighted score based on votes
+      // Note: votesFor/votesAgainst are already quadratic (sqrt applied on-chain), don't double-sqrt
       let totalScore = 0;
       for (const report of addressReports) {
-        const votePowerFor = Math.sqrt(Number(ethers.formatEther(report.votesFor)));
-        const votePowerAgainst = Math.sqrt(Number(ethers.formatEther(report.votesAgainst)));
-        totalScore += ((votePowerFor - votePowerAgainst) / (votePowerFor + votePowerAgainst)) * 100;
+        const votePowerFor = Number(report.votesFor);
+        const votePowerAgainst = Number(report.votesAgainst);
+        const total = votePowerFor + votePowerAgainst;
+        if (total > 0) {
+          totalScore += ((votePowerFor - votePowerAgainst) / total) * 100;
+        }
       }
 
       return Math.max(0, Math.min(100, totalScore / addressReports.length));
@@ -726,9 +734,9 @@ export const reportScam = async (scammer: string, reason: string, evidence: stri
  * @param inSupport Whether to vote in support
  * @returns Transaction hash
  */
-export const voteOnProposal = async (proposalId: string, inSupport: boolean): Promise<string> => {
+export const voteOnProposal = async (proposalId: string, inSupport: boolean, tokens: string = '1000000000000000000'): Promise<string> => {
   try {
-    const tx = await contractService.voteOnScamReport(proposalId, inSupport);
+    const tx = await contractService.voteOnScamReport(proposalId, inSupport, tokens);
     const receipt = await tx.wait();
     return receipt.hash;
   } catch (error: any) {
