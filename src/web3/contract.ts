@@ -30,6 +30,7 @@ const QUADRATIC_VOTING_ABI = [
   "function getProposal(uint256 proposalId) view returns (tuple(address reporter, address suspiciousAddress, string description, string evidence, uint256 votesFor, uint256 votesAgainst, bool isActive))",
   "function getVote(uint256 proposalId, address voter) view returns (tuple(bool hasVoted, bool support, uint256 tokens, uint256 power))",
   "function isScammer(address) view returns (bool)",
+  "function scamScore(address) view returns (uint256)",
   "function proposalCount() view returns (uint256)",
 
   // State-changing functions
@@ -755,7 +756,11 @@ class ContractService extends EventEmitter {
   public async isScamAddress(address: string): Promise<boolean> {
     if (!this.votingContract) await this.init();
     try {
-      return await this.votingContract?.isScammer(address);
+      const result = await this.votingContract?.isScammer(address);
+      console.log(
+        `[DAO] eth_call isScammer(${address}) → ${result}  |  contract: ${this.votingContract?.target}`,
+      );
+      return result;
     } catch (error) {
       console.warn("isScammer check failed (non-fatal):", error);
       return false;
@@ -766,26 +771,15 @@ class ContractService extends EventEmitter {
     if (!this.votingContract) await this.init();
 
     try {
-      const reports = await this.getScamReports();
-      const addressReports = reports.filter(
-        (r) => r.suspiciousAddress.toLowerCase() === address.toLowerCase(),
+      // ── REAL on-chain read: public mapping scamScore(address) → uint256 ──
+      // This is a direct eth_call to the QuadraticVoting contract.
+      // The contract increments scamScore by +25 each time executeProposal() confirms a scam.
+      const onChainScore = await this.votingContract?.scamScore(address);
+      const score = Number(onChainScore ?? 0);
+      console.log(
+        `[DAO] eth_call scamScore(${address}) → ${score}  |  contract: ${this.votingContract?.target}`,
       );
-
-      if (addressReports.length === 0) return 0;
-
-      // Calculate weighted score based on votes
-      // Note: votesFor/votesAgainst are already quadratic (sqrt applied on-chain), don't double-sqrt
-      let totalScore = 0;
-      for (const report of addressReports) {
-        const votePowerFor = Number(report.votesFor);
-        const votePowerAgainst = Number(report.votesAgainst);
-        const total = votePowerFor + votePowerAgainst;
-        if (total > 0) {
-          totalScore += ((votePowerFor - votePowerAgainst) / total) * 100;
-        }
-      }
-
-      return Math.max(0, Math.min(100, totalScore / addressReports.length));
+      return Math.min(100, score);
     } catch (err) {
       console.error("Error calculating scam score:", err);
       return 0;

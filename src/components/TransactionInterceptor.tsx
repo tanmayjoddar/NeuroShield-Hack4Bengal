@@ -234,6 +234,8 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
               scamScore,
               activeProposals,
               verdict,
+              contract: "QuadraticVoting @ 0x7A791fe5A35131B7d98f854a64E7f94180F27C7b",
+              calls: ["isScammer(address) → eth_call", "scamScore(address) → eth_call"],
             });
             setDaoData({ isScammer, scamScore, activeProposals, verdict });
           } catch (daoErr) {

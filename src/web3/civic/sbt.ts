@@ -138,7 +138,11 @@ export const hasSBT = async (address: string): Promise<boolean> => {
   const sbt = getSBTContract();
   if (!sbt) return false;
   try {
-    return Boolean(await sbt.hasSBT(address));
+    const result = Boolean(await sbt.hasSBT(address));
+    console.log(
+      `[SBT] eth_call hasSBT(${address}) → ${result}  |  contract: ${CIVIC_SBT_ADDRESS}`,
+    );
+    return result;
   } catch (err) {
     console.warn("[SBT] hasSBT call failed:", err);
     return false;
@@ -160,13 +164,19 @@ export const getOnChainMetadata = async (
     if (!has) return null;
 
     const raw = await sbt.getTokenMetadata(address);
-    return {
+    const metadata = {
       issuedAt: Number(raw.issuedAt),
       verificationLevel: Number(raw.verificationLevel),
       trustScore: Number(raw.trustScore),
       votingAccuracy: Number(raw.votingAccuracy),
       doiParticipation: Number(raw.doiParticipation),
     };
+    console.log(
+      `[SBT] eth_call getTokenMetadata(${address}) →`,
+      metadata,
+      ` |  contract: ${CIVIC_SBT_ADDRESS}`,
+    );
+    return metadata;
   } catch (err) {
     console.warn("[SBT] getTokenMetadata failed:", err);
     return null;
@@ -174,14 +184,20 @@ export const getOnChainMetadata = async (
 };
 
 /**
- * Read the on-chain token URI (Base64-encoded JSON stored directly on-chain).
- * This is the "works if every server on earth goes offline" part.
+ * Read the on-chain token URI (Base64-encoded JSON stored directly in the contract).
+ *
+ * This calls the REAL tokenURI(tokenId) via eth_call — not a local reconstruction.
+ * The contract's generateTokenURI() encodes metadata as Base64 JSON and stores it
+ * via _setTokenURI(), so tokenURI() returns the actual on-chain value.
+ *
+ * Visible in browser DevTools Network tab as an eth_call to the SBT contract.
  */
 export const getOnChainTokenURI = async (
   address: string,
 ): Promise<{
   raw: string;
   decoded: SBTTokenURIData;
+  tokenId: number;
 } | null> => {
   const sbt = getSBTContract();
   if (!sbt) return null;
@@ -190,47 +206,59 @@ export const getOnChainTokenURI = async (
     const has = await sbt.hasSBT(address);
     if (!has) return null;
 
-    // We need the tokenId to call tokenURI
-    // The contract maps address → tokenId via _addressToTokenId which is private,
-    // but we can use the standard ERC721 tokenURI by finding the token.
-    // The SBT contract uses getTokenMetadata(address) so the tokenId mapping is internal.
-    // For tokenURI, we'll call it via the address-based pattern through metadata.
-    const metadata = await sbt.getTokenMetadata(address);
-    if (!metadata) return null;
+    // ── Resolve tokenId ──
+    // Try getTokenIdForAddress(address) first (new contract with public getter).
+    // Fallback: query SBTMinted event logs (works with any deployment).
+    let tokenId: number | null = null;
 
-    // Reconstruct token URI from metadata (mirrors the on-chain generateTokenURI)
-    const tokenURIData: SBTTokenURIData = {
-      name: `Civic Soulbound Token`,
-      description:
-        "Non-transferable token representing Civic identity verification and DAO reputation",
-      image: `https://civic.me/api/sbt-image/0`,
-      attributes: [
-        { trait_type: "Issued At", value: String(Number(metadata.issuedAt)) },
-        {
-          trait_type: "Verification Level",
-          value: String(Number(metadata.verificationLevel)),
-        },
-        {
-          trait_type: "Trust Score",
-          value: String(Number(metadata.trustScore)),
-        },
-        {
-          trait_type: "Voting Accuracy",
-          value: String(Number(metadata.votingAccuracy)),
-        },
-        {
-          trait_type: "DOI Participation",
-          value: String(Number(metadata.doiParticipation)),
-        },
-      ],
-    };
+    try {
+      const id = await sbt.getTokenIdForAddress(address);
+      tokenId = Number(id);
+    } catch {
+      // Fallback: scan SBTMinted events for this address
+      try {
+        const filter = sbt.filters.SBTMinted(address);
+        const events = await sbt.queryFilter(filter);
+        if (events.length > 0) {
+          const event = events[events.length - 1]; // latest mint
+          const args = (event as any).args;
+          tokenId = Number(args?.tokenId ?? args?.[1]);
+        }
+      } catch (evtErr) {
+        console.warn("[SBT] Event log fallback failed:", evtErr);
+      }
+    }
 
-    // Build the same Base64 data URI the contract generates
-    const jsonStr = JSON.stringify(tokenURIData);
-    const base64 = btoa(jsonStr);
-    const dataURI = `data:application/json;base64,${base64}`;
+    if (tokenId === null) {
+      console.warn("[SBT] Could not resolve tokenId for:", address);
+      return null;
+    }
 
-    return { raw: dataURI, decoded: tokenURIData };
+    // ── Call the REAL on-chain tokenURI(uint256) — this is a genuine eth_call ──
+    const onChainURI: string = await sbt.tokenURI(tokenId);
+    console.log(
+      `[SBT] eth_call tokenURI(${tokenId}) → ${onChainURI.slice(0, 60)}...  |  contract: ${CIVIC_SBT_ADDRESS}`,
+    );
+
+    // ── Decode the Base64 JSON returned by the contract ──
+    let decoded: SBTTokenURIData;
+    try {
+      const BASE64_PREFIX = "data:application/json;base64,";
+      const base64Data = onChainURI.startsWith(BASE64_PREFIX)
+        ? onChainURI.slice(BASE64_PREFIX.length)
+        : onChainURI;
+      const jsonStr = atob(base64Data);
+      decoded = JSON.parse(jsonStr);
+    } catch {
+      decoded = {
+        name: `Civic Soulbound Token #${tokenId}`,
+        description: "Non-transferable on-chain reputation token",
+        image: "",
+        attributes: [],
+      };
+    }
+
+    return { raw: onChainURI, decoded, tokenId };
   } catch (err) {
     console.warn("[SBT] getOnChainTokenURI failed:", err);
     return null;
@@ -259,6 +287,7 @@ export const getSBTProfile = async (address: string): Promise<SBTProfile> => {
 
     return {
       hasSBT: true,
+      tokenId: tokenURI?.tokenId,
       metadata,
       tokenURI: tokenURI?.raw,
       decodedURI: tokenURI?.decoded,
@@ -400,31 +429,36 @@ export const updateSBT = async (params: {
 // ════════════════════════════════════════════
 
 /**
- * Decompose an on-chain SBT trust score into its 4 components.
- * This is a pure function — just breaks down the stored score.
+ * Decompose an on-chain SBT trust score into its 4 bar values.
+ *
+ * All inputs come from on-chain contract storage (via getTokenMetadata eth_call):
+ *   - metadata.verificationLevel  → stored on-chain, determines civic bar (0 or 40)
+ *   - metadata.votingAccuracy      → stored on-chain (0-100%), scaled to bar (0-20)
+ *   - metadata.doiParticipation    → stored on-chain (vote count), scaled to bar (0-20)
+ *   - metadata.trustScore          → stored on-chain (the total), tx bar = remainder
+ *
+ * This is a deterministic, pure function: identical on-chain inputs always produce
+ * identical bar values. Anyone can verify by reading getTokenMetadata() and applying
+ * the same formula. The contract uses the same weights during mint/update.
  */
 export const decomposeOnChainTrustScore = (
   metadata: SBTMetadata,
 ): TrustBreakdown => {
-  // The on-chain trust score is the sum; decompose using the formula:
-  //   civic = 40 if level > 0 else 0
-  //   tx    = stored separately (we approximate from total - others)
-  //   accuracy = floor(votingAccuracy * 0.2)
-  //   participation = min(20, doiParticipation * 2)
-
-  const civic = metadata.verificationLevel > 0 ? 40 : 0;
-  const accuracy = Math.floor(metadata.votingAccuracy * 0.2);
-  const participation = Math.min(20, metadata.doiParticipation * 2);
-  const txHistory = Math.max(
-    0,
-    metadata.trustScore - civic - accuracy - participation,
+  // Each component is derived from a specific on-chain field:
+  const civic = metadata.verificationLevel > 0 ? 40 : 0; // on-chain: verificationLevel
+  const accuracy = Math.min(20, Math.floor(metadata.votingAccuracy * 0.2)); // on-chain: votingAccuracy (0-100%)
+  const participation = Math.min(20, metadata.doiParticipation * 2); // on-chain: doiParticipation (count)
+  // Transaction history is not stored separately — derive from the on-chain total:
+  const txHistory = Math.min(
+    20,
+    Math.max(0, metadata.trustScore - civic - accuracy - participation),
   );
 
   return {
     civicVerification: civic,
-    transactionHistory: Math.min(20, txHistory),
-    votingAccuracy: Math.min(20, accuracy),
-    daoParticipation: Math.min(20, participation),
+    transactionHistory: txHistory,
+    votingAccuracy: accuracy,
+    daoParticipation: participation,
     total: metadata.trustScore,
   };
 };
@@ -453,6 +487,9 @@ export const computeLiveTrustScore = async (
       try {
         const verified = await verifier.isVerified(address);
         const level = await verifier.getVerificationLevel(address);
+        console.log(
+          `[SBT] eth_call isVerified(${address}) → ${verified}  |  contract: ${CIVIC_VERIFIER_ADDRESS}`,
+        );
         return { isVerified: Boolean(verified), level: Number(level) };
       } catch {
         return { isVerified: false, level: 0 };
@@ -465,6 +502,9 @@ export const computeLiveTrustScore = async (
       if (!qv) return { accuracy: 0, participation: 0 };
       try {
         const stats = await qv.getVoterStats(address);
+        console.log(
+          `[SBT] eth_call getVoterStats(${address}) → accuracy=${stats[0]}, participation=${stats[1]}  |  contract: ${QV_ADDRESS}`,
+        );
         return {
           accuracy: Number(stats.accuracy || stats[0] || 0),
           participation: Number(stats.participation || stats[1] || 0),

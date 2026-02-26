@@ -306,6 +306,9 @@ const SoulboundToken: React.FC = () => {
             <div className="mb-6">
               <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
                 Trust Score Breakdown
+                <span className="ml-2 text-xs font-normal text-gray-600 normal-case">
+                  (derived from on-chain contract data)
+                </span>
               </h3>
               {breakdown && (
                 <>
@@ -346,9 +349,38 @@ const SoulboundToken: React.FC = () => {
             {/* On-Chain Metadata */}
             <div className="mb-6">
               <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                On-Chain Data
+                On-Chain Contract Data
+                <span className="ml-2 text-xs font-normal text-green-500/70 normal-case">
+                  via eth_call → getTokenMetadata()
+                </span>
               </h3>
               <div className="grid grid-cols-2 gap-3 text-sm">
+                {profile.tokenId !== undefined && (
+                  <div className="bg-gray-800 rounded-lg p-3 col-span-2">
+                    <span className="text-gray-500 block text-xs">
+                      Token ID
+                    </span>
+                    <span className="text-white font-mono">
+                      #{profile.tokenId}
+                    </span>
+                  </div>
+                )}
+                <div className="bg-gray-800 rounded-lg p-3">
+                  <span className="text-gray-500 block text-xs">
+                    Trust Score (raw)
+                  </span>
+                  <span className="text-white font-mono">
+                    {profile.metadata.trustScore}
+                  </span>
+                </div>
+                <div className="bg-gray-800 rounded-lg p-3">
+                  <span className="text-gray-500 block text-xs">
+                    Verification Level
+                  </span>
+                  <span className="text-white font-mono">
+                    {profile.metadata.verificationLevel} ({levelToString(profile.metadata.verificationLevel)})
+                  </span>
+                </div>
                 <div className="bg-gray-800 rounded-lg p-3">
                   <span className="text-gray-500 block text-xs">
                     Voting Accuracy
@@ -365,6 +397,22 @@ const SoulboundToken: React.FC = () => {
                     {profile.metadata.doiParticipation}
                   </span>
                 </div>
+                <div className="bg-gray-800 rounded-lg p-3">
+                  <span className="text-gray-500 block text-xs">
+                    Issued At
+                  </span>
+                  <span className="text-white font-mono text-xs">
+                    {new Date(profile.metadata.issuedAt * 1000).toISOString()}
+                  </span>
+                </div>
+                <div className="bg-gray-800 rounded-lg p-3">
+                  <span className="text-gray-500 block text-xs">
+                    Contract
+                  </span>
+                  <span className="text-green-400 font-mono text-xs">
+                    {import.meta.env.VITE_CIVIC_SBT_ADDRESS?.slice(0, 10)}...
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -375,12 +423,16 @@ const SoulboundToken: React.FC = () => {
                 className="text-sm text-purple-400 hover:text-purple-300 flex items-center gap-1"
               >
                 {showRawURI ? "▾" : "▸"} View Raw On-Chain Token URI
+                <span className="ml-1 text-xs text-gray-600">
+                  (eth_call → tokenURI)
+                </span>
               </button>
               {showRawURI && profile.tokenURI && (
                 <div className="mt-2 bg-gray-800 rounded-lg p-3 overflow-x-auto">
                   <p className="text-xs text-gray-500 mb-1">
-                    Fully on-chain Base64 JSON — no IPFS, no server, no
-                    dependencies
+                    Read directly from contract via tokenURI(
+                    {profile.tokenId ?? "?"}) — fully on-chain Base64 JSON, no
+                    IPFS, no server
                   </p>
                   <code className="text-xs text-green-400 break-all font-mono leading-relaxed">
                     {profile.tokenURI}
