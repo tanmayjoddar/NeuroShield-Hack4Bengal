@@ -46,110 +46,118 @@ const SendPage: React.FC = () => {
   };
   
   return (
-    <div className="container mx-auto py-8 max-w-2xl">
-      <h1 className="text-3xl font-bold mb-8 text-center">Send Tokens</h1>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <div className="container mx-auto py-8 max-w-2xl px-6">
+        <div className="flex items-center gap-4 mb-8">
+          <Button variant="outline" size="icon" onClick={() => navigate('/')} className="border-white/20 text-gray-300 hover:bg-white/10">
+            <Wallet className="h-4 w-4" />
+          </Button>
+          <h1 className="text-3xl font-bold text-white">Send Tokens</h1>
+        </div>
       
-      {/* Wallet Connection Status */}
-      <Card className="mb-6">
-        <CardHeader className="pb-2">
-          <div className="flex justify-between items-center">
-            <CardTitle>Wallet Status</CardTitle>
-            {connectedAddress ? (
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Connected</Badge>
-            ) : (
-              <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Not Connected</Badge>
-            )}
-          </div>
-        </CardHeader>
-        
-        <CardContent>
-          {connectedAddress ? (
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Connected Address:</p>
-                <p className="font-mono text-sm">{connectedAddress}</p>
-              </div>
-              <Wallet className="h-5 w-5 text-gray-500" />
+        {/* Wallet Connection Status */}
+        <Card className="mb-6 bg-black/20 backdrop-blur-lg border-white/10">
+          <CardHeader className="pb-2">
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-white">Wallet Status</CardTitle>
+              {connectedAddress ? (
+                <Badge variant="outline" className="bg-green-500/20 text-green-400 border-green-500/30">Connected</Badge>
+              ) : (
+                <Badge variant="outline" className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Not Connected</Badge>
+              )}
             </div>
-          ) : (
-            <div className="text-center">
-              <p className="mb-2 text-sm">Please connect your wallet to continue</p>
-              <Button onClick={handleConnectWallet}>
-                <Wallet className="mr-2 h-4 w-4" />
-                Connect Wallet
+          </CardHeader>
+        
+          <CardContent>
+            {connectedAddress ? (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-400">Connected Address:</p>
+                  <p className="font-mono text-sm text-white">{connectedAddress}</p>
+                </div>
+                <Wallet className="h-5 w-5 text-gray-400" />
+              </div>
+            ) : (
+              <div className="text-center">
+                <p className="mb-2 text-sm text-gray-400">Please connect your wallet to continue</p>
+                <Button onClick={handleConnectWallet} className="bg-cyan-500 hover:bg-cyan-600">
+                  <Wallet className="mr-2 h-4 w-4" />
+                  Connect Wallet
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      
+        {/* Fraud Detection Status */}
+        <Card className="mb-6 bg-black/20 backdrop-blur-lg border-white/10">
+          <CardHeader className="pb-2">
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-white">Transaction Protection</CardTitle>
+              <Button 
+                variant={fraudDetectionEnabled ? "default" : "outline"} 
+                size="sm" 
+                onClick={toggleFraudDetection}
+                className={fraudDetectionEnabled ? "bg-green-500/20 text-green-400 hover:bg-green-500/30" : "border-white/20 text-gray-400"}
+              >
+                <Shield className="mr-2 h-4 w-4" />
+                {fraudDetectionEnabled ? "Enabled" : "Disabled"}
               </Button>
             </div>
-          )}
-        </CardContent>
-      </Card>
-      
-      {/* Fraud Detection Status */}
-      <Card className="mb-6">
-        <CardHeader className="pb-2">
-          <div className="flex justify-between items-center">
-            <CardTitle>Transaction Protection</CardTitle>
-            <Button 
-              variant={fraudDetectionEnabled ? "default" : "outline"} 
-              size="sm" 
-              onClick={toggleFraudDetection}
-            >
-              <Shield className="mr-2 h-4 w-4" />
-              {fraudDetectionEnabled ? "Enabled" : "Disabled"}
-            </Button>
-          </div>
-          <CardDescription>
-            AI-powered fraud detection using external ML API
-          </CardDescription>
-        </CardHeader>
+            <CardDescription className="text-gray-400">
+              AI-powered fraud detection using external ML API
+            </CardDescription>
+          </CardHeader>
         
-        <CardContent>
-          <div className="flex items-start space-x-2 text-sm">
-            <AlertCircle className={`h-5 w-5 ${fraudDetectionEnabled ? 'text-green-500' : 'text-yellow-500'}`} />
-            <p>
-              {fraudDetectionEnabled ? 
-                "Fraud detection is active. Suspicious transactions will be flagged before processing." : 
-                "Warning: Fraud detection is disabled. Enable it to protect your assets."}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Send Transaction Form */}
-      {connectedAddress ? (
-        <SendTransaction 
-          onSuccess={handleTransactionSuccess} 
-          onFraudDetected={handleFraudDetected}
-        />
-      ) : (
-        <Card>
-          <CardContent className="py-8">
-            <div className="text-center text-gray-500">
-              <Wallet className="mx-auto h-8 w-8 mb-2" />
-              <p>Connect your wallet to send tokens</p>
+          <CardContent>
+            <div className="flex items-start space-x-2 text-sm">
+              <AlertCircle className={`h-5 w-5 ${fraudDetectionEnabled ? 'text-green-400' : 'text-yellow-400'}`} />
+              <p className="text-gray-300">
+                {fraudDetectionEnabled ? 
+                  "Fraud detection is active. Suspicious transactions will be flagged before processing." : 
+                  "Warning: Fraud detection is disabled. Enable it to protect your assets."}
+              </p>
             </div>
           </CardContent>
         </Card>
-      )}
       
-      {/* Last Transaction Info */}
-      {lastTransaction && (
-        <div className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Transaction Sent</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm">Transaction Hash:</p>
-              <p className="font-mono text-sm break-all">{lastTransaction}</p>
+        {/* Send Transaction Form */}
+        {connectedAddress ? (
+          <SendTransaction 
+            onSuccess={handleTransactionSuccess} 
+            onFraudDetected={handleFraudDetected}
+          />
+        ) : (
+          <Card className="bg-black/20 backdrop-blur-lg border-white/10">
+            <CardContent className="py-8">
+              <div className="text-center text-gray-400">
+                <Wallet className="mx-auto h-8 w-8 mb-2" />
+                <p>Connect your wallet to send tokens</p>
+              </div>
             </CardContent>
-            <CardFooter>
-              <Button variant="outline" className="w-full" onClick={() => window.open(`https://explorer.testnet.monad.xyz/tx/${lastTransaction}`, '_blank')}>
-                View on Explorer
-              </Button>
-            </CardFooter>
           </Card>
-        </div>
-      )}
+        )}
+      
+        {/* Last Transaction Info */}
+        {lastTransaction && (
+          <div className="mt-6">
+            <Card className="bg-black/20 backdrop-blur-lg border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white">Transaction Sent</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-400">Transaction Hash:</p>
+                <p className="font-mono text-sm break-all text-white">{lastTransaction}</p>
+              </CardContent>
+              <CardFooter>
+                <Button variant="outline" className="w-full border-white/20 text-gray-300 hover:bg-white/10" onClick={() => window.open(`https://explorer.testnet.monad.xyz/tx/${lastTransaction}`, '_blank')}>
+                  View on Explorer
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

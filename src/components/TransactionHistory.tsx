@@ -66,85 +66,65 @@ const TransactionHistory = () => {
         const userAddress = walletConnector.address;
         
         try {
-          // Get real transactions using ethers provider
+          // Get real transactions from localStorage (logged by TransactionInterceptor)
+          const rawLogs = localStorage.getItem('transaction-logs');
+          const logs: Array<{
+            timestamp: string;
+            from: string;
+            to: string;
+            value: number;
+            gasPrice: number;
+            riskScore: number;
+            riskLevel: string;
+            blocked: boolean;
+            whitelisted: boolean;
+          }> = rawLogs ? JSON.parse(rawLogs) : [];
+
+          // Also try to get the real transaction count from provider for context
           const provider = walletConnector.provider;
-          
-          if (!provider) {
-            throw new Error("Provider not available");
+          let txCount = 0;
+          if (provider) {
+            try {
+              txCount = await provider.getTransactionCount(userAddress);
+            } catch { /* ignore */ }
           }
-          
-          // For simplicity in this implementation, we'll use mock data
-          // In a real production app, you would:
-          // 1. Use an explorer API like Etherscan, Alchemy, or Infura
-          // 2. Or integrate with a proper transaction indexing service
-          
-          // This simulates real transaction history based on the connected wallet
-          const mockTransactions: Transaction[] = [
-            {
+
+          // Convert localStorage logs into our Transaction format
+          const realTransactions: Transaction[] = logs
+            .filter(log => log.from === userAddress || log.to === userAddress)
+            .slice(0, 20)
+            .map((log, index) => ({
+              id: index + 1,
+              type: log.blocked ? 'approve' as const : (log.from === userAddress ? 'send' as const : 'receive' as const),
+              amount: `${log.value || 0} ETH`,
+              to: log.to,
+              from: log.from,
+              status: log.blocked ? 'blocked' as const : 'safe' as const,
+              hash: null,
+              timestamp: new Date(log.timestamp).toLocaleString(),
+              gasUsed: `${log.gasPrice || 0} Gwei`,
+              reason: log.blocked ? `Blocked — Risk Score: ${(log.riskScore || 0).toFixed(1)}% (${log.riskLevel || 'Unknown'})` : undefined
+            }));
+
+          if (realTransactions.length > 0) {
+            setTransactions(realTransactions);
+            console.log(`Loaded ${realTransactions.length} real transaction logs for ${shortenAddress(userAddress)}`);
+          } else if (txCount > 0) {
+            // User has on-chain transactions but no ML-scanned logs yet
+            setTransactions([{
               id: 1,
               type: 'send',
-              amount: '0.5 ETH',
-              to: '0x742d35Cc6E8877bC2eC20E2a9eE29D38d098d6',
+              amount: `${txCount} historical txs`,
               from: userAddress,
               status: 'safe',
-              hash: '0x8f4b7c1a2d3e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e',
-              timestamp: '10 min ago',
-              gasUsed: '21,000'
-            },
-            {
-              id: 2,
-              type: 'receive',
-              amount: '0.1 ETH',
-              from: '0x1f9840a85d5aF5bf1D1762F925BDAdc4201F984',
-              to: userAddress,
-              status: 'safe',
-              hash: '0x1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t1u2v3w4x5y6z7a8b9c0d1e2f',
-              timestamp: '1 hour ago',
-              gasUsed: '21,000'
-            },
-            {
-              id: 3,
-              type: 'approve',
-              amount: 'Token Approval',
-              to: '0xDEADBEEF01234567ABCDEF123456789MALICIOUS',
-              from: userAddress,
-              status: 'blocked',
               hash: null,
-              timestamp: '2 hours ago',
+              timestamp: 'On-chain history',
               gasUsed: 'N/A',
-              reason: 'Detected unlimited approval to suspicious contract'
-            },
-            {
-              id: 4,
-              type: 'contract',
-              amount: '0.01 ETH',
-              to: '0x7a791fe5a35131b7d98f854a64e7f94180f27c7b',
-              from: userAddress,
-              status: 'safe',
-              hash: '0x3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b',
-              timestamp: '1 day ago',
-              gasUsed: '85,420'
-            },
-            {
-              id: 5,
-              type: 'receive',
-              amount: '0.25 ETH',
-              from: '0x2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c',
-              to: userAddress,
-              status: 'safe',
-              hash: '0x4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c',
-              timestamp: '3 days ago',
-              gasUsed: '21,000'
-            }
-          ];
-          
-          setTransactions(mockTransactions);
-          console.log("Mock transactions loaded for user", shortenAddress(userAddress));
-          
-          // In a future implementation, we'll replace this with:
-          // 1. Get transactions from an explorer API
-          // 2. Parse and categorize them
-          // 3. Apply security checks on each transaction
+              reason: 'Send a transaction through NeuroShield to see ML-scanned logs here'
+            }]);
+          } else {
+            setTransactions([]);
+          }
         } catch (err: any) {
           console.error("Failed to fetch transaction history:", err);
           setError("Could not load transaction history");
@@ -156,12 +136,15 @@ const TransactionHistory = () => {
 
     fetchTransactions();
     
-    // Setup event listeners for wallet connection changes
+    // Setup event listeners for wallet connection changes and new transaction logs
     const handleAccountChange = () => fetchTransactions();
+    const handleNewLog = () => fetchTransactions();
     window.addEventListener('wallet_accountChanged', handleAccountChange);
+    window.addEventListener('transaction-logged', handleNewLog);
     
     return () => {
       window.removeEventListener('wallet_accountChanged', handleAccountChange);
+      window.removeEventListener('transaction-logged', handleNewLog);
     };
   }, []);
 

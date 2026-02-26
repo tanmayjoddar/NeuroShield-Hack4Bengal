@@ -46,17 +46,15 @@ const Index = () => {
     value: 0,
     gasPrice: 0,
   });
-  const [suspiciousAddress, setSuspiciousAddress] = useState(
-    "0xa12066091c6F636505Bd64F2160EA1884142B38c",
-  ); // Add this line
+  const [suspiciousAddress, setSuspiciousAddress] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
-  const [aiScansToday, setAiScansToday] = useState(247);
-  const [blockedThreats, setBlockedThreats] = useState(15);
-  const [savedAmount, setSavedAmount] = useState(12450);
+  const [aiScansToday, setAiScansToday] = useState(0);
+  const [blockedThreats, setBlockedThreats] = useState(0);
+  const [savedAmount, setSavedAmount] = useState(0);
 
   // New gamification states
-  const [securityScore, setSecurityScore] = useState(67);
-  const [shieldLevel, setShieldLevel] = useState("Defender");
+  const [securityScore, setSecurityScore] = useState(0);
+  const [shieldLevel, setShieldLevel] = useState("Rookie");
   const [showAIFeedback, setShowAIFeedback] = useState(false);
   const [lastAction, setLastAction] = useState<
     "vote" | "report" | "block" | "scan"
@@ -67,6 +65,60 @@ const Index = () => {
   );
 
   const { toast } = useToast();
+
+  // Derive dashboard stats from real localStorage transaction logs
+  useEffect(() => {
+    const loadRealStats = () => {
+      try {
+        const raw = localStorage.getItem('transaction-logs');
+        const logs: Array<{
+          timestamp: string;
+          to: string;
+          value: number;
+          riskScore: number;
+          riskLevel: string;
+          blocked: boolean;
+        }> = raw ? JSON.parse(raw) : [];
+
+        // Total ML scans = total log entries
+        setAiScansToday(logs.length);
+
+        // Blocked threats
+        const blocked = logs.filter(l => l.blocked);
+        setBlockedThreats(blocked.length);
+
+        // Saved amount = sum of values from blocked txs (displayed as USD estimate)
+        const totalSaved = blocked.reduce((sum, l) => sum + (l.value || 0), 0);
+        setSavedAmount(Math.round(totalSaved * 3200)); // rough ETH→USD
+
+        // Security score from log quality
+        const baseScore = Math.min(30, logs.length * 2);
+        const blockBonus = Math.min(40, blocked.length * 5);
+        const activityBonus = Math.min(30, logs.length);
+        setSecurityScore(Math.min(100, baseScore + blockBonus + activityBonus));
+
+        // Shield level
+        const s = baseScore + blockBonus + activityBonus;
+        if (s >= 90) setShieldLevel('Guardian Elite');
+        else if (s >= 75) setShieldLevel('Shield Master');
+        else if (s >= 60) setShieldLevel('Defender');
+        else if (s >= 40) setShieldLevel('Guardian');
+        else setShieldLevel('Rookie');
+
+        // Last suspicious address from blocked txs
+        if (blocked.length > 0) {
+          setSuspiciousAddress(blocked[0].to || '');
+        }
+      } catch {
+        // Safe defaults if localStorage fails
+      }
+    };
+
+    loadRealStats();
+    // Refresh when new transactions are logged
+    window.addEventListener('transaction-logged', loadRealStats);
+    return () => window.removeEventListener('transaction-logged', loadRealStats);
+  }, []);
 
   // Reset threat level after some time for demo purposes
   useEffect(() => {
@@ -365,14 +417,18 @@ const Index = () => {
                 detection and autonomous security features.
               </p>
               <div className="flex flex-wrap gap-4 justify-center lg:justify-start animate-fade-in-up animation-delay-300">
-                <Button className="bg-cyan-500 hover:bg-cyan-600 text-white px-8 py-6 text-lg rounded-xl transition-all hover:scale-105">
-                  Get Started
+                <Button
+                  className="bg-cyan-500 hover:bg-cyan-600 text-white px-8 py-6 text-lg rounded-xl transition-all hover:scale-105"
+                  onClick={() => navigate('/send')}
+                >
+                  Send Tokens
                 </Button>
                 <Button
                   variant="outline"
                   className="border-cyan-500 text-cyan-400 hover:bg-cyan-500/10 px-8 py-6 text-lg rounded-xl transition-all hover:scale-105"
+                  onClick={simulateScamTransaction}
                 >
-                  Watch Demo
+                  Try AI Demo
                 </Button>
               </div>
               <div className="flex items-center gap-8 justify-center lg:justify-start animate-fade-in-up animation-delay-400">
@@ -385,8 +441,8 @@ const Index = () => {
                   ))}
                 </div>
                 <div className="text-left">
-                  <div className="text-2xl font-bold text-white">10k+</div>
-                  <div className="text-gray-400">Protected Wallets</div>
+                  <div className="text-2xl font-bold text-white">{aiScansToday}</div>
+                  <div className="text-gray-400">Transactions Scanned</div>
                 </div>
               </div>
             </div>{" "}
@@ -437,18 +493,28 @@ const Index = () => {
                         ))}
                       </div>
                     </div>
-                    <div className="space-y-4">
-                      <div className="h-4 w-3/4 bg-white/5 rounded animate-pulse"></div>
-                      <div className="h-4 w-1/2 bg-white/5 rounded animate-pulse"></div>
+                    <div className="space-y-3">
+                      <div className="text-xs text-gray-400 uppercase tracking-wider">Wallet</div>
+                      <div className="text-sm text-white font-mono">
+                        {currentAddress ? `${currentAddress.slice(0, 6)}...${currentAddress.slice(-4)}` : 'Not Connected'}
+                      </div>
+                      <div className="text-xs text-gray-400 uppercase tracking-wider mt-3">Shield Level</div>
+                      <div className="text-sm text-cyan-400 font-medium">{shieldLevel}</div>
                     </div>
                     <div className="mt-auto">
-                      <div className="grid grid-cols-3 gap-4">
-                        {[...Array(3)].map((_, i) => (
-                          <div
-                            key={i}
-                            className="h-20 bg-white/5 rounded-lg animate-pulse"
-                          ></div>
-                        ))}
+                      <div className="grid grid-cols-3 gap-4 text-center">
+                        <div className="p-2 bg-white/5 rounded-lg">
+                          <div className="text-sm font-bold text-white">{aiScansToday}</div>
+                          <div className="text-[10px] text-gray-400">Scans</div>
+                        </div>
+                        <div className="p-2 bg-white/5 rounded-lg">
+                          <div className="text-sm font-bold text-white">{blockedThreats}</div>
+                          <div className="text-[10px] text-gray-400">Blocked</div>
+                        </div>
+                        <div className="p-2 bg-white/5 rounded-lg">
+                          <div className="text-sm font-bold text-white">{securityScore}</div>
+                          <div className="text-[10px] text-gray-400">Score</div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -512,10 +578,7 @@ const Index = () => {
                       {aiScansToday}
                     </div>
                     <p className="text-xs text-gray-400 mt-2 group-hover:text-gray-300 transition-colors">
-                      <span className="text-green-400 group-hover:animate-pulse">
-                        +{Math.floor(Math.random() * 20) + 5}%
-                      </span>{" "}
-                      from yesterday
+                      ML-powered real-time scanning
                     </p>
                   </CardContent>
                 </Card>
@@ -668,37 +731,39 @@ const Index = () => {
                     </span>
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Recent reports with enhanced styling */}
+                    {/* Recent reports from real transaction logs */}
                     <div className="group/card p-4 bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 transition-all duration-300 hover:scale-[1.02]">
                       <h4 className="text-white font-medium mb-4 flex items-center gap-2">
-                        <span>Recent Reports</span>
+                        <span>Recent Blocked Transactions</span>
                         <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></div>
                       </h4>
                       <div className="text-sm text-gray-400 space-y-3">
-                        <div className="flex justify-between items-center p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
-                          <span className="group-hover/card:text-white transition-colors">
-                            Token Drainer
-                          </span>
-                          <Badge className="bg-red-500/20 text-red-400 group-hover/card:animate-pulse">
-                            High Risk
-                          </Badge>
-                        </div>
-                        <div className="flex justify-between items-center p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
-                          <span className="group-hover/card:text-white transition-colors">
-                            Fake Airdrop
-                          </span>
-                          <Badge className="bg-yellow-500/20 text-yellow-400 group-hover/card:animate-pulse">
-                            Medium Risk
-                          </Badge>
-                        </div>
-                        <div className="flex justify-between items-center p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
-                          <span className="group-hover/card:text-white transition-colors">
-                            Rug Pull Contract
-                          </span>
-                          <Badge className="bg-green-500/20 text-green-400 group-hover/card:animate-pulse">
-                            Resolved
-                          </Badge>
-                        </div>
+                        {(() => {
+                          try {
+                            const rawLogs = localStorage.getItem('transaction-logs');
+                            const logs = rawLogs ? JSON.parse(rawLogs) : [];
+                            const blocked = logs.filter((l: any) => l.blocked).slice(0, 3);
+                            if (blocked.length === 0) {
+                              return (
+                                <div className="text-center py-4 text-gray-500">
+                                  No blocked transactions yet. Use the AI Demo or send a transaction to see real reports here.
+                                </div>
+                              );
+                            }
+                            return blocked.map((log: any, i: number) => (
+                              <div key={i} className="flex justify-between items-center p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
+                                <span className="group-hover/card:text-white transition-colors font-mono text-xs">
+                                  {log.to ? `${log.to.slice(0, 6)}...${log.to.slice(-4)}` : 'Unknown'}
+                                </span>
+                                <Badge className={`${log.riskLevel === 'High' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                                  {log.riskLevel || 'Medium'} Risk — {(log.riskScore || 0).toFixed(0)}%
+                                </Badge>
+                              </div>
+                            ));
+                          } catch {
+                            return <div className="text-gray-500">No reports available</div>;
+                          }
+                        })()}
                       </div>
                     </div>
                     {/* Enhanced submit button */}
@@ -870,7 +935,7 @@ const Index = () => {
                           Enable AI-powered transaction scanning
                         </p>
                       </div>
-                      <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                      <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Active</Badge>
                     </div>
                     <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
                       <div>
@@ -881,7 +946,7 @@ const Index = () => {
                           Automatically block transactions with 90%+ risk score
                         </p>
                       </div>
-                      <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                      <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Active</Badge>
                     </div>
                     <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
                       <div>
@@ -892,7 +957,7 @@ const Index = () => {
                           Show warnings from community-reported contracts
                         </p>
                       </div>
-                      <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                      <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Active</Badge>
                     </div>
                   </div>
                 </CardContent>
@@ -901,25 +966,6 @@ const Index = () => {
               {/* Telegram Settings Integration */}
               <TelegramSettings walletAddress={currentAddress} />
             </div>
-          )}
-          {activeTab === "recovery" && (
-            <Card className="bg-black/20 backdrop-blur-lg border-white/10">
-              <CardHeader>
-                <CardTitle className="text-white">
-                  Guardian Recovery Settings
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <p className="text-gray-400 text-sm">
-                    Manage your Guardian recovery settings. Enable recovery
-                    options to enhance wallet security.
-                  </p>
-
-                  <GuardianManager walletAddress={currentAddress} />
-                </div>
-              </CardContent>
-            </Card>
           )}
         </main>
       </div>
