@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/Base64.sol";
  * @title CivicSBT
  * @dev Soulbound Token (SBT) for Civic verification status and voter reputation.
  * Tokens can be minted but not transferred, following SBT principles.
- * 
+ *
  * Authorized updaters (CivicVerifier, QuadraticVoting) can modify metadata
  * to reflect changes in verification level, trust score, and voting accuracy.
  */
@@ -147,7 +147,7 @@ contract CivicSBT is ERC721URIStorage {
 
         uint256 tokenId = _addressToTokenId[holder];
         TokenMetadata storage metadata = _tokenMetadata[tokenId];
-        
+
         metadata.verificationLevel = verificationLevel;
         metadata.trustScore = trustScore;
         metadata.votingAccuracy = votingAccuracy;
@@ -183,7 +183,7 @@ contract CivicSBT is ERC721URIStorage {
      */
     function generateTokenURI(uint256 tokenId) internal view returns (string memory) {
         TokenMetadata memory metadata = _tokenMetadata[tokenId];
-        
+
         bytes memory dataURI = abi.encodePacked(
             '{',
             '"name": "Civic Soulbound Token #', tokenId.toString(), '",',

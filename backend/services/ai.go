@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net/http"
 	"strings"
 	"time"
@@ -56,22 +57,63 @@ type AIModelResponse struct {
 	Features    map[string]float64 `json:"feature_importance"`
 }
 
-// AnalyzeTransaction calls the ML model + DAO scam database to analyze transaction risk.
-// This is the backend side of the dual-layer flywheel:
-//   ML prediction + DAO community-confirmed scam data = combined risk score.
+// AnalyzeTransaction calls the deployed Render ML API + DAO scam database.
+// We own ZERO ml code — the model lives at ml-fraud-transaction-detection.onrender.com.
+// Our job: send the best possible 18-feature payload, then layer DAO data on top.
 func (s *AIService) AnalyzeTransaction(tx models.Transaction) (float64, error) {
-	// Create a fixed array of 18 features as required by external ML API
+	// ──────────────────────────────────────────────────
+	// Build the 18-feature vector the deployed model expects.
+	// Feature positions (from the model's training dataset):
+	//  [0]  Avg min between sent tnx
+	//  [1]  Avg min between received tnx
+	//  [2]  Time diff between first and last (mins)
+	//  [3]  Sent tnx count
+	//  [4]  Received tnx count
+	//  [5]  Number of created contracts
+	//  [6]  Max value received (ETH)
+	//  [7]  Avg value received (ETH)
+	//  [8]  Avg value sent (ETH)
+	//  [9]  Total ether sent
+	//  [10] Total ether balance
+	//  [11] ERC20 total ether received
+	//  [12] ERC20 total ether sent to contracts
+	//  [13] Transaction value (current tx)
+	//  [14] Gas price
+	//  [15] ERC20 unique sent addresses
+	//  [16] ERC20 unique received token names
+	//  [17] Wallet age (days)
+	// ──────────────────────────────────────────────────
 	features := make([]float64, 18)
-
-	// Populate known features
-	features[13] = tx.Value  // Transaction value
+	features[13] = tx.Value
 	gasPrice := 20.0
-	features[14] = gasPrice  // Gas price
-
-	// Determine if this is a contract interaction
+	features[14] = gasPrice
 	isContract := false
 
-	// Prepare request payload for external ML API
+	// Populate the rest from wallet analytics (DB + RPC data we already collect).
+	// This is NOT adding ML code — it's filling the request with real data
+	// instead of sending 16 zeros to the deployed model.
+	if s.analyticsService != nil {
+		if wa, err := s.analyticsService.GetWalletAnalytics(tx.FromAddress); err == nil && wa != nil {
+			features[0] = wa.AvgMinBetweenSentTx
+			features[1] = wa.AvgMinBetweenReceivedTx
+			features[2] = wa.TimeDiffFirstLastMins
+			features[3] = float64(wa.SentTxCount)
+			features[4] = float64(wa.ReceivedTxCount)
+			features[5] = float64(wa.CreatedContractsCount)
+			features[6] = weiToEth(wa.MaxValueReceived)
+			features[7] = weiToEth(wa.AvgValueReceived)
+			features[8] = weiToEth(wa.AvgValueSent)
+			features[9] = weiToEth(wa.TotalEtherSent)
+			features[10] = weiToEth(wa.TotalEtherBalance)
+			features[11] = weiToEth(wa.ERC20TotalEtherReceived)
+			features[12] = weiToEth(wa.ERC20TotalEtherSentContract)
+			features[15] = float64(wa.ERC20UniqSentAddr)
+			features[16] = float64(wa.ERC20UniqRecTokenName)
+			features[17] = float64(wa.WalletAge)
+		}
+		// If analytics fails we still have [13]+[14] — same as before, no worse.
+	}
+
 	request := AIModelRequest{
 		FromAddress:           tx.FromAddress,
 		ToAddress:             tx.ToAddress,
@@ -87,7 +129,6 @@ func (s *AIService) AnalyzeTransaction(tx models.Transaction) (float64, error) {
 		return 0, fmt.Errorf("error marshaling request: %w", err)
 	}
 
-	// Make HTTP request to ML model with timeout
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Post(s.modelURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -103,12 +144,10 @@ func (s *AIService) AnalyzeTransaction(tx models.Transaction) (float64, error) {
 		Prediction string `json:"prediction"`
 		Type       string `json:"Type"`
 	}
-
 	if err := json.NewDecoder(resp.Body).Decode(&externalResponse); err != nil {
 		return 0, fmt.Errorf("error decoding model response: %w", err)
 	}
 
-	// Convert ML prediction to risk score
 	var mlRisk float64
 	switch externalResponse.Prediction {
 	case "Fraud":
@@ -123,14 +162,25 @@ func (s *AIService) AnalyzeTransaction(tx models.Transaction) (float64, error) {
 	// FLYWHEEL: Boost risk with DAO-confirmed scam data
 	// ══════════════════════════════════════════════════
 	daoBoost := s.getDAOScamBoost(tx.ToAddress)
-
-	// Combine: ML risk + DAO boost (capped at 1.0)
 	combinedRisk := mlRisk + daoBoost
 	if combinedRisk > 1.0 {
 		combinedRisk = 1.0
 	}
 
 	return combinedRisk, nil
+}
+
+// weiToEth converts a big.Int string (Wei) to float64 ETH. Returns 0 on error.
+func weiToEth(s string) float64 {
+	if s == "" || s == "0" {
+		return 0
+	}
+	f, ok := new(big.Float).SetString(s)
+	if !ok {
+		return 0
+	}
+	eth, _ := new(big.Float).Quo(f, new(big.Float).SetFloat64(1e18)).Float64()
+	return eth
 }
 
 // getDAOScamBoost queries the DAO confirmed scam database and returns a risk boost.

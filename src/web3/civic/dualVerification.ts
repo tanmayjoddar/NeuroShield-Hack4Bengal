@@ -79,14 +79,45 @@ const ML_API_TIMEOUT = 10000; // 10 second timeout
 
 /**
  * Run ML-based scam detection on a transaction.
- * Connects to the real external ML API.
+ * Calls the deployed Render ML API — we own zero ML code.
+ * We populate the 18-feature array with whatever on-chain data
+ * the connected wallet provider can give us (balance, nonce, etc).
  */
 const runMlScamDetection = async (transaction: TransactionData): Promise<MLResult> => {
   try {
-    // Build feature array for ML model (18 features)
+    // ── Build the 18-feature payload ──────────────────────
+    // Positions match the model's training dataset columns.
     const features = new Array(18).fill(0);
-    features[13] = parseFloat(transaction.value) || 0;        // Transaction value
-    features[14] = parseFloat(transaction.gasPrice || '20');   // Gas price
+    const txValue = parseFloat(transaction.value) || 0;
+    const gasPrice = parseFloat(transaction.gasPrice || '20');
+    features[13] = txValue;   // current tx value
+    features[14] = gasPrice;  // gas price
+
+    // Populate what we can from the connected wallet provider.
+    // These are cheap RPC calls (usually cached by MetaMask).
+    try {
+      const provider = walletConnector.provider
+        ? new ethers.BrowserProvider(walletConnector.provider)
+        : null;
+
+      if (provider && transaction.from) {
+        const [balance, txCount] = await Promise.all([
+          provider.getBalance(transaction.from),
+          provider.getTransactionCount(transaction.from),
+        ]);
+
+        // [3] sent_tnx — nonce is a good proxy for total sent txs
+        features[3] = txCount;
+        // [10] total_ether_balance
+        features[10] = parseFloat(ethers.formatEther(balance));
+        // [8] avg_value_sent — rough estimate: balance / nonce
+        if (txCount > 0) {
+          features[8] = features[10] / txCount;
+        }
+      }
+    } catch {
+      // Non-critical — features stay 0, same as before
+    }
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), ML_API_TIMEOUT);
@@ -97,8 +128,8 @@ const runMlScamDetection = async (transaction: TransactionData): Promise<MLResul
       body: JSON.stringify({
         from_address: transaction.from,
         to_address: transaction.to,
-        transaction_value: parseFloat(transaction.value) || 0,
-        gas_price: parseFloat(transaction.gasPrice || '20'),
+        transaction_value: txValue,
+        gas_price: gasPrice,
         is_contract_interaction: transaction.isContractInteraction || false,
         acc_holder: transaction.from,
         features,
