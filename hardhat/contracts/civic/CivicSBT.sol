@@ -171,6 +171,15 @@ contract CivicSBT is ERC721URIStorage {
     }
 
     /**
+     * @dev Get the token ID for a given address.
+     * Required by the frontend to call tokenURI(tokenId) for the real on-chain Base64 URI.
+     */
+    function getTokenIdForAddress(address owner) public view returns (uint256) {
+        require(hasSBT(owner), "Address has no SBT");
+        return _addressToTokenId[owner];
+    }
+
+    /**
      * @dev Get token metadata for an address.
      */
     function getTokenMetadata(address owner) public view returns (TokenMetadata memory) {
