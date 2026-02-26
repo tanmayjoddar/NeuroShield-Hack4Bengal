@@ -332,6 +332,38 @@ The visual difference is unmistakable — the DAO row goes from gray "+0%" to re
 
 ---
 
+## ACT 6.5 (OPTIONAL): THE ANALYTICS — VISUAL PROOF
+
+> **Use this only if you have 30+ extra seconds.** If tight on time, skip straight to ACT 7. But if judges are engaged and you have the time, this is where you turn data into a visual knockout.
+
+**TIME:** ~30 seconds (optional)
+
+**ACTION:** Click the **Analytics** tab.
+
+**SAY:**
+
+> "Everything we just did — the scan, the report, the vote — is now visualized."
+
+[POINT AT the **Threat Score Timeline** chart — the area chart with the red spike]
+
+> "This is every scan result plotted over time. See that spike? That's the Ronin address at eighty-five percent. Every dot is a real ML prediction — not mock data, not hardcoded numbers. These are the actual risk scores our model returned."
+
+[Switch tab to **Transaction Network**]
+
+[PAUSE — let the force-directed graph animate and settle. This is visually impressive. Give it 2-3 seconds.]
+
+> "And this — this is the network graph. My wallet in the center. Every address I interacted with is a node. See the red node? That's the DAO-confirmed scam address — verified on-chain via `isScammer()`. Green nodes are whitelisted. Gray is unknown."
+
+[PAUSE — point at the red node]
+
+> "One glance and you can see exactly who in your network is dangerous. All of it from real blockchain data."
+
+**SHOW:** Analytics tab — Threat Score Timeline with risk spikes visible, then Transaction Network with red scam node, green safe nodes, gray unknowns. Force-directed layout animating.
+
+**WHY IT LANDS:** Judges who are visual thinkers will connect instantly. The network graph is the single most impressive visual in the demo — a living map of wallet relationships with scam nodes lit up in red. This is the "lean forward" moment.
+
+---
+
 ## ACT 7: THE CLOSE
 
 **TIME:** 6:15 – 6:45 (30 seconds)
