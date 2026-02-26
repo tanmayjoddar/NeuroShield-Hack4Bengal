@@ -119,7 +119,9 @@ class ContractService extends EventEmitter {
       // Try to recover wallet connection if provider/signer are missing
       if (!walletConnector.provider || !walletConnector.signer) {
         if (typeof window !== "undefined" && window.ethereum) {
-          const accounts = await window.ethereum.request({ method: "eth_accounts" });
+          const accounts = await window.ethereum.request({
+            method: "eth_accounts",
+          });
           if (accounts && accounts.length > 0) {
             const { BrowserProvider } = await import("ethers");
             walletConnector.provider = new BrowserProvider(window.ethereum);
@@ -127,7 +129,10 @@ class ContractService extends EventEmitter {
             walletConnector.address = accounts[0];
             const network = await walletConnector.provider.getNetwork();
             walletConnector.chainId = Number(network.chainId);
-            console.log("init: Wallet auto-reconnected:", walletConnector.address);
+            console.log(
+              "init: Wallet auto-reconnected:",
+              walletConnector.address,
+            );
           } else {
             throw new Error("Wallet not connected");
           }
@@ -603,17 +608,26 @@ class ContractService extends EventEmitter {
 
       // Ensure wallet connector has provider/signer — re-connect if needed
       if (!walletConnector.provider || !walletConnector.signer) {
-        console.log("Wallet connector missing provider/signer, reconnecting...");
+        console.log(
+          "Wallet connector missing provider/signer, reconnecting...",
+        );
         if (typeof window !== "undefined" && window.ethereum) {
           const { BrowserProvider } = await import("ethers");
-          const accounts = await window.ethereum.request({ method: "eth_accounts" });
+          const accounts = await window.ethereum.request({
+            method: "eth_accounts",
+          });
           if (accounts && accounts.length > 0) {
             walletConnector.provider = new BrowserProvider(window.ethereum);
             walletConnector.signer = await walletConnector.provider.getSigner();
             walletConnector.address = accounts[0];
             const network = await walletConnector.provider.getNetwork();
             walletConnector.chainId = Number(network.chainId);
-            console.log("Wallet reconnected:", walletConnector.address, "chain:", walletConnector.chainId);
+            console.log(
+              "Wallet reconnected:",
+              walletConnector.address,
+              "chain:",
+              walletConnector.chainId,
+            );
           } else {
             throw new Error("Please connect your wallet first");
           }
