@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Shield, AlertTriangle, CheckCircle, Zap, Users, FileText, Settings, PieChart, Key } from 'lucide-react';
+import { Shield, AlertTriangle, CheckCircle, Zap, Users, FileText, Settings, PieChart, Key, Fingerprint } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,7 @@ import GuardianManager from '@/components/GuardianManager';
 import { useCivicStore } from '@/stores/civicStore';
 import SimpleCivicAuth from '@/components/civic/SimpleCivicAuth';
 import MEVProtectionTester from '@/components/MEVProtectionTester';
+import SoulboundToken from '@/components/SoulboundToken';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -266,6 +267,17 @@ const Index = () => {
               >
                 <Key className="h-5 w-5" />
                 Recovery
+              </button>
+              <button
+                onClick={() => setActiveTab('sbt')}
+                className={`flex items-center gap-2 px-3 py-2 transition-all duration-300 hover:scale-105 ${
+                  activeTab === 'sbt'
+                    ? 'text-cyan-400 font-medium scale-105'
+                    : 'text-gray-400 hover:text-white hover:underline decoration-cyan-400/50 underline-offset-4'
+                }`}
+              >
+                <Fingerprint className="h-5 w-5" />
+                SBT
               </button>
               <button
                 onClick={() => setActiveTab('settings')}
@@ -607,6 +619,79 @@ const Index = () => {
                 <GuardianManager walletAddress={currentAddress} />
               </CardContent>
             </Card>
+          )}
+
+          {activeTab === 'sbt' && (
+            <div className="space-y-6">
+              <Card className="group bg-black/20 backdrop-blur-lg border-white/10 hover:bg-black/30 transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/20">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <Fingerprint className="h-5 w-5 text-purple-400" />
+                    <span>Soulbound Token</span>
+                    <Badge className="bg-purple-500/20 text-purple-400 ml-2">On-Chain Identity</Badge>
+                  </CardTitle>
+                  <p className="text-gray-400 mt-2">
+                    Your permanent on-chain reputation. Cannot be transferred, cannot be faked, cannot be taken down.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <SoulboundToken />
+                </CardContent>
+              </Card>
+
+              {/* Trust Score Formula */}
+              <Card className="group bg-black/20 backdrop-blur-lg border-white/10 hover:bg-black/30 transition-all duration-300">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <span className="text-lg">How Your Trust Score Works</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="font-mono text-sm bg-white/5 rounded-lg p-4 mb-4 border border-white/10">
+                    <div className="text-purple-400">+40 Are you a verified human?</div>
+                    <div className="text-blue-400">+20 Do you have transaction history?</div>
+                    <div className="text-green-400">+20 Do you vote correctly in the DAO?</div>
+                    <div className="text-amber-400">+20 Do you actually participate?</div>
+                    <div className="text-gray-500 mt-1">────</div>
+                    <div className="text-white font-bold">100 Your permanent on-chain reputation</div>
+                  </div>
+                  <p className="text-gray-400 text-sm leading-relaxed">
+                    Every component is independently verifiable from on-chain data. The trust score lives forever as Base64-encoded JSON directly inside the smart contract — no IPFS, no server, no dependency.
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Technical Details */}
+              <Card className="group bg-black/20 backdrop-blur-lg border-white/10 hover:bg-black/30 transition-all duration-300">
+                <CardHeader>
+                  <CardTitle className="text-white">Technical Details</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between items-center p-3 bg-white/5 rounded-lg">
+                      <span className="text-gray-400">Token Standard</span>
+                      <span className="text-white font-mono">ERC-721 (Soulbound)</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-white/5 rounded-lg">
+                      <span className="text-gray-400">Transfer Behavior</span>
+                      <span className="text-red-400 font-mono">revert("SBTs cannot be transferred")</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-white/5 rounded-lg">
+                      <span className="text-gray-400">Metadata Storage</span>
+                      <span className="text-green-400 font-mono">On-chain Base64 JSON</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-white/5 rounded-lg">
+                      <span className="text-gray-400">Network</span>
+                      <span className="text-white font-mono">Monad Testnet (10143)</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-white/5 rounded-lg">
+                      <span className="text-gray-400">Updatable By</span>
+                      <span className="text-white font-mono">CivicVerifier (authorized only)</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           )}
 
           {activeTab === 'settings' && (
