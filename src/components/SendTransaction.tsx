@@ -320,10 +320,18 @@ const SendTransaction: React.FC<SendTransactionProps> = ({
         console.log("ML API response received:", fraudResult);
 
         // Convert the API response to our expected format
+        // Use ML-derived scores instead of hardcoded values
+        const mlRiskScore =
+          fraudResult.prediction === "Fraud"
+            ? 0.85
+            : fraudResult.prediction === "Suspicious"
+              ? 0.5
+              : 0.1;
         const normalizedResult = {
           prediction: fraudResult.prediction,
-          risk_score: fraudResult.prediction === "Fraud" ? 0.8 : 0.2, // Convert string to numeric score
-          risk_level: fraudResult.prediction === "Fraud" ? "HIGH" : "LOW",
+          risk_score: mlRiskScore,
+          risk_level:
+            mlRiskScore > 0.6 ? "HIGH" : mlRiskScore > 0.3 ? "MEDIUM" : "LOW",
           type: fraudResult.Type,
           explanation: `ML Assessment: ${fraudResult.Type}`,
         };

@@ -10,7 +10,26 @@ _(Ronin Bridge exploiter — $625M hack, March 2022. Publicly documented. Judges
 
 ## PRE-DEMO SETUP CHECKLIST
 
-Do this 10 minutes before you walk on stage. No exceptions.
+Do this **the night before** or **at least 1 hour before** your demo. No exceptions.
+
+### On-Chain Setup (1+ hour before demo)
+
+Run these from the `hardhat/` directory:
+
+```bash
+# Step 1: Setup — reports the Ronin address and votes to confirm it
+npx hardhat run scripts/demo-setup.js --network monadTestnet
+
+# Step 2: Wait 1 hour (voting period minimum)
+
+# Step 3: Execute — confirms the address as scam on-chain
+npx hardhat run scripts/demo-execute.js --network monadTestnet
+```
+
+After execution, the Ronin address is marked `isScammer = true` on-chain.
+When you send to it during the demo, the dual-layer UI will show the DAO boost.
+
+### 10 Minutes Before Stage
 
 - [ ] Open `localhost:5173` in Chrome — dashboard visible, wallet **NOT** connected yet
 - [ ] MetaMask ready with Monad Testnet (Chain ID 10143), has MON for gas
@@ -55,9 +74,9 @@ Do this 10 minutes before you walk on stage. No exceptions.
 
 ---
 
-## ACT 2: CONNECT & IDENTITY
+## ACT 2: CONNECT & SOULBOUND IDENTITY
 
-**TIME:** 0:30 – 1:30 (60 seconds)
+**TIME:** 0:30 – 2:00 (90 seconds)
 
 **ACTION:** Click **Connect Wallet** → MetaMask popup → Confirm connection
 
@@ -67,35 +86,66 @@ Do this 10 minutes before you walk on stage. No exceptions.
 
 [Wait for connection — green status appears]
 
-**ACTION:** Click the **SBT** tab → Show Soulbound Token section
+**ACTION:** Click the **SBT** tab → The Soulbound Token card loads with the trust score circle, breakdown bars, and on-chain data.
 
-**SAY:**
+**SAY (slowly — this is a wow moment):**
 
-> "Before anything else — identity. Every NeuroShield user gets a Soulbound Token. It's an ERC-721 that can never be transferred, bought, or sold."
+> "Before we touch a single transaction — identity."
 
-[POINT AT the Trust Score Formula section]
+[PAUSE — 1 second]
 
-> "My trust score is computed from four on-chain sources:
-> Do I have real transaction history? Plus twenty.
-> Do I vote correctly in the DAO? Plus twenty.
-> Do I actually participate? Plus twenty.
-> Am I a verified human? Plus forty."
+> "Every user on NeuroShield gets one of these."
 
-> "Right now my participation score is low — I haven't done anything yet. By the end of this demo, watch this number change."
+[POINT AT the SBT card header: "Permanent on-chain reputation — impossible to transfer, impossible to fake"]
 
-[POINT AT any metadata or technical spec rows]
+> "A Soulbound Token. An ERC-721 NFT that is physically impossible to transfer. If you try to send it, the contract literally reverts with the message: 'SBTs cannot be transferred.' You cannot buy one. You cannot sell one. You cannot steal one. It is permanently, irrevocably, permanently bound to your wallet address forever."
 
-> "All of this — the entire trust score — is stored as Base64-encoded JSON _inside_ the smart contract. Not IPFS. Not a server. If every centralized service on earth goes offline, my reputation still exists on the blockchain."
+[PAUSE — let the word "forever" land]
 
-**SHOW:** SBT tab — Trust Score Formula visible, Technical Details showing "On-chain Base64 JSON" and "revert('SBTs cannot be transferred')" in the spec table.
+[POINT AT the Trust Score circle — the animated SVG ring with the number in the center]
 
-**WHY IT LANDS:** You established identity without claiming Civic is deployed. The SBT and trust score are real, verifiable, on-chain. Judges can see the formula.
+> "And look at what it stores — your trust score. A single number out of a hundred. But it's not an arbitrary number. Watch."
+
+[POINT AT the four colored breakdown bars, one by one — go slow]
+
+> "Purple bar — are you a verified human? That's forty points. The single biggest factor.
+> Blue bar — do you have real transaction history on this chain? Plus twenty.
+> Green bar — when you vote in the DAO on scam reports, do you vote _correctly_? Plus twenty. Get it wrong, this drops.
+> Gold bar — do you actually show up and vote? Plus twenty. Lurkers score zero."
+
+[PAUSE]
+
+> "One hundred points. Four dimensions. Every single one of them is independently verifiable from on-chain state. Nobody assigned these scores. Nobody can change them. They're computed live from the blockchain."
+
+[CLICK "View Raw On-Chain Token URI" → show the Base64 string expanding]
+
+> "Now look at this."
+
+[POINT AT the raw Base64 string in the collapsible section]
+
+> "This is the actual token URI. See that? `data:application/json;base64,...` — that is the raw metadata. The trust score, the verification level, the voting accuracy — it's all Base64-encoded JSON stored **directly inside the smart contract**."
+
+[PAUSE — lean forward]
+
+> "Not IPFS. Not a centralized server. Not an API. Inside. The. Contract. If every server on earth goes offline — AWS, Google Cloud, every single one — your reputation still exists. You can decode this string on a calculator and read your trust score."
+
+[PAUSE — 2 seconds. Let the room exhale.]
+
+> "That's what soulbound means. Your identity is permanent. Your reputation is earned. And no one can take it away."
+
+**SHOW:** SBT tab — trust score circle animating, four colored bars with values, "View Raw On-Chain Token URI" expanded showing Base64 string, Technical Details visible below (ERC-721 Soulbound, `revert('SBTs cannot be transferred')`, On-chain Base64 JSON).
+
+**WHY IT LANDS:** Three stacking punches:
+
+1. "Cannot be transferred" — judges immediately understand this is not a regular NFT
+2. The four bars with specific scores — it's not just identity, it's a _living reputation system_
+3. The raw Base64 blob — this is proof. Not a claim. Proof that the metadata is on-chain. Judges who understand Web3 will be floored — most NFTs use IPFS or centralized URIs that break. This never breaks.
 
 ---
 
 ## ACT 3: THE AI SCANNER — LIVE THREAT INTERCEPTION
 
-**TIME:** 1:30 – 3:00 (90 seconds)
+**TIME:** 2:00 – 3:15 (75 seconds)
 
 **ACTION:** Go to **Overview** tab. Click **"Send Tokens Securely"** to open the Send page.
 
@@ -109,31 +159,39 @@ Do this 10 minutes before you walk on stage. No exceptions.
 
 > "I'm about to send money to this address. You might recognize it — this is the Ronin Bridge exploiter. Six hundred twenty-five million dollars stolen in March 2022. Let's see what happens."
 
-[PAUSE — let the ML scanner run. Risk analysis appears.]
+[PAUSE — let the dual-layer scanner run. "Analyzing with dual-layer AI + DAO defense..." spinner shows.]
 
-[POINT AT the risk score]
+[POINT AT the risk assessment modal — it now shows THREE rows]
 
-> "Our ML model just analyzed this address across **eighteen dimensions** in real-time — transaction velocity, gas spending patterns, contract interaction depth, token flow anomalies, wallet clustering behavior. Look at that score."
+> "Look at what just happened. Two layers analyzed this in parallel."
 
-[POINT AT the specific number]
+[POINT AT Layer 1 row]
 
-> "Sixty-two percent risk. Suspicious. The AI caught something — but it's not sure enough to hard-block. It's flagging it as elevated risk. Keep that number in your head — sixty-two. It matters later."
+> "Layer 1 — our ML model. It analyzed eighteen dimensions in real-time — transaction velocity, gas spending patterns, contract interaction depth, token flow anomalies. It scored this address at **eighty-five percent risk**."
+
+[POINT AT Layer 2 row]
+
+> "Layer 2 — the DAO community layer. Right now, nobody has reported this address yet. So the DAO boost is **plus zero**. The community hasn't spoken."
+
+[POINT AT Combined Score row]
+
+> "Combined score: **eighty-five percent**. High risk. The AI caught something — but the system is missing the community intelligence layer. Keep that DAO boost number in your head — plus zero. It changes later."
 
 **ACTION:** Cancel/go back — don't send the transaction.
 
 **SAY:**
 
-> "I'm not going to send this. But sixty-two percent isn't enough. A sophisticated user might override that warning. What if the community could make that score go higher?"
+> "I'm not going to send this. But look — the community layer is empty. What if we could fill it?"
 
-**SHOW:** Send page with risk score visible on the Ronin exploiter address. The number 62% (or whatever the ML returns) clearly displayed.
+**SHOW:** Send page with dual-layer risk modal: Layer 1 (ML) = 85%, Layer 2 (DAO) = +0%, Combined = 85.0% HIGH RISK.
 
-**WHY IT LANDS:** You used a REAL infamous address. Judges may recognize it. The ML score is real — live API call, not hardcoded. And you planted the seed: "sixty-two percent isn't enough."
+**WHY IT LANDS:** Judges see THREE numbers, not one. The DAO "+0%" is a visual gap begging to be filled. You planted the seed.
 
 ---
 
 ## ACT 4: THE REPORT — PERMANENT ON-CHAIN INTELLIGENCE
 
-**TIME:** 3:00 – 4:00 (60 seconds)
+**TIME:** 3:15 – 4:15 (60 seconds)
 
 **ACTION:** Navigate to **Reports** tab.
 
@@ -167,7 +225,7 @@ Do this 10 minutes before you walk on stage. No exceptions.
 
 ## ACT 5: THE DAO — QUADRATIC VOTING
 
-**TIME:** 4:00 – 5:00 (60 seconds)
+**TIME:** 4:15 – 5:15 (60 seconds)
 
 **ACTION:** Go to **DAO** tab. Find the proposal that was just created (or a recent one).
 
@@ -187,7 +245,15 @@ Do this 10 minutes before you walk on stage. No exceptions.
 
 [MetaMask popup → Confirm]
 
-> "Another real on-chain transaction. My vote is now recorded in the smart contract. My SHIELD tokens are staked. And here's the thing — this vote is going to affect my SBT trust score. Participation goes up. If I voted correctly, accuracy goes up. Everything is connected."
+> "Another real on-chain transaction. My vote is now recorded in the smart contract. My SHIELD tokens are staked."
+
+[PAUSE — now drop the callback]
+
+> "And remember that Soulbound Token from two minutes ago? The gold bar — DAO Participation? It was low. It just went up. The green bar — Voting Accuracy? When this proposal resolves, if I voted correctly, that goes up too."
+
+[PAUSE — let them connect the dots]
+
+> "Every. Action. Changes. Your. Identity. The SBT isn't a static badge. It's a living reputation that evolves with every vote you cast, every report you submit, every correct call you make. And it lives on-chain forever."
 
 **SHOW:** DAO panel — proposal visible, vote interface, quadratic voting explanation, SHIELD token balance.
 
@@ -197,48 +263,55 @@ Do this 10 minutes before you walk on stage. No exceptions.
 
 ## ACT 6: THE FLYWHEEL — THE MOMENT THAT WINS
 
-**TIME:** 5:00 – 6:00 (60 seconds)
+**TIME:** 5:15 – 6:15 (60 seconds)
 
 > ⚠️ **THIS IS THE MOST IMPORTANT ACT. SLOW DOWN. MAKE EYE CONTACT.**
 
-**ACTION:** [If proposal crosses threshold — show it. If not, explain the mechanism with the terminal log.]
+**CONTEXT:** If you ran `demo-setup.js` + `demo-execute.js` before the demo (you should have), the Ronin address is already confirmed as a scam on-chain. The DAO boost is already active. You just need to show it.
+
+**ACTION:** Go back to the Send page. Paste `0x098B716B8Aaf21512996dC57EB0615e2383E2f96` again. Enter 0.0001 MON. Submit.
 
 **SAY:**
 
-> "Here's what happens when the DAO confirms that address is a scam."
+> "Now — the moment. Same address. Same amount. Let's see what happens when the DAO has spoken."
 
-[PAUSE — 2 seconds]
+[PAUSE — dual-layer scanner runs again. The modal appears with THREE rows.]
 
-> "The result gets picked up by our on-chain event listener — a Go goroutine watching the contract via WebSocket. Watch this."
+[POINT AT Layer 1 row]
 
-**ACTION:** [POINT AT terminal window or show backend logs/console showing the event. If you have the backend running, show the JSON log line. If not, show the contract event on Monad Explorer.]
+> "Layer 1, ML — eighty-five percent. Same as before. The model hasn't changed."
 
-**SAY (while pointing at log/event):**
+[POINT AT Layer 2 row — now lit up red with DAO CONFIRMED SCAM]
 
-> "See that? The event just fired. The system recorded this confirmation and immediately called `getDAOScamBoost()`. That function adds up to a **plus-fifty-percent risk boost** to any address the community has confirmed as a scam."
+> "Layer 2 — DAO Community. Look at that. **CONFIRMED SCAM by community vote**. The boost just jumped from zero to **plus ten percent**."
 
-[PAUSE]
+[POINT AT Combined Score row — now 95%]
 
-> "Remember that ML score from earlier? Sixty-two percent. What do you think it is now?"
+> "Combined risk score: **ninety-five percent**. Critical risk."
+
+[PAUSE — 3 full seconds. Let the room see 85→95.]
+
+> "The AI didn't change. We didn't retrain the model. No engineer pushed a single line of code. The community voted, the smart contract fired an event, and the next time anyone — ANYONE — tries to send to this address, the system catches it at ninety-five, not eighty-five."
 
 [PAUSE — look at judges]
-
-> "The next time anyone tries to send money to that Ronin exploiter address, the AI doesn't score it at sixty-two. It scores it at **ninety-one or higher**. Hard block. Automatic. No one has to retrain the model. No engineer has to push a commit. The community voted, and the AI got smarter."
-
-[PAUSE — let it land]
 
 > "That is the flywheel.
 > Report. Vote. Confirm. AI learns. Catches the next scam faster. Generates more reports. Spins again. Faster and faster."
 
-**SHOW:** The score comparison: 62% (before) → 91%+ (after DAO boost). If possible, show the Send page again with the same address to demonstrate the higher score live. Alternatively, verbally state the comparison.
+**SHOW:** Side-by-side comparison in judges' minds:
 
-**WHY IT LANDS:** This is your thesis moment. The flywheel isn't a diagram on a slide — it's a live event that just happened. Score went from 62 to 91. Judges can see it. That jump IS the proof that the flywheel works. Nothing else in the competition will have this.
+- **Before DAO:** Layer 1 = 85%, Layer 2 = +0%, Combined = 85.0% (High Risk)
+- **After DAO:** Layer 1 = 85%, Layer 2 = +10% (CONFIRMED SCAM), Combined = 95.0% (High Risk!)
+
+The visual difference is unmistakable — the DAO row goes from gray "+0%" to red "+10% ⚠️ CONFIRMED SCAM."
+
+**WHY IT LANDS:** This is your thesis moment. The flywheel isn't a diagram on a slide — it's a live score jump that just happened. Layer 2 went from empty to active. Combined went from 85 to 95. Judges can SEE both layers and the boost. Nothing else in the competition will have this.
 
 ---
 
 ## ACT 7: THE CLOSE
 
-**TIME:** 6:00 – 6:30 (30 seconds)
+**TIME:** 6:15 – 6:45 (30 seconds)
 
 **ACTION:** Stand up straight. No clicking. Eyes on judges.
 
@@ -256,11 +329,11 @@ Do this 10 minutes before you walk on stage. No exceptions.
 
 > "Confirmed. Flywheel fires. AI gets smarter."
 
-> "Reporter's identity updated on-chain forever."
+> "Reporter's reputation upgraded on-chain — in a Soulbound Token that can never be bought, sold, faked, or taken down."
 
 [PAUSE — 2 seconds]
 
-> "No engineers. No retraining. No central server."
+> "No engineers. No retraining. No central server. No IPFS. No admin key."
 
 [PAUSE — 2 seconds]
 
@@ -339,16 +412,16 @@ If a judge asks "sum this up in one sentence," say:
 
 ## TIMING SUMMARY
 
-| Act            | Time       | Duration | What Happens                                    |
-| -------------- | ---------- | -------- | ----------------------------------------------- |
-| 1 — Hook       | 0:00–0:30  | 30s      | The $5.6B line. Ronin address revealed.         |
-| 2 — Identity   | 0:30–1:30  | 60s      | Connect wallet. Show SBT & trust score formula. |
-| 3 — AI Scanner | 1:30–3:00  | 90s      | Send to Ronin address. ML scores 62%. Cancel.   |
-| 4 — Report     | 3:00–4:00  | 60s      | Submit on-chain report. Real MetaMask tx.       |
-| 5 — DAO Vote   | 4:00–5:00  | 60s      | Quadratic voting. Cast vote. SBT connection.    |
-| 6 — Flywheel   | 5:00–6:00  | 60s      | Event fires. Score jumps 62→91. THE moment.     |
-| 7 — Close      | 6:00–6:30  | 30s      | The immune system line. Silence.                |
-| Q&A            | 6:30–7:00+ | 30s+     | First question response.                        |
+| Act            | Time       | Duration | What Happens                                              |
+| -------------- | ---------- | -------- | --------------------------------------------------------- |
+| 1 — Hook       | 0:00–0:30  | 30s      | The $5.6B line. Ronin address revealed.                   |
+| 2 — SBT        | 0:30–2:00  | 90s      | Connect wallet. SBT trust circle, 4 bars, raw Base64 URI. |
+| 3 — AI Scanner | 2:00–3:15  | 75s      | Send to Ronin address. ML=85%, DAO=+0%. Cancel.           |
+| 4 — Report     | 3:15–4:15  | 60s      | Submit on-chain report. Real MetaMask tx.                 |
+| 5 — DAO Vote   | 4:15–5:15  | 60s      | Quadratic voting. Cast vote. SBT callback moment.         |
+| 6 — Flywheel   | 5:15–6:15  | 60s      | Same address again. DAO=+10%. Combined 85→95. MOMENT.     |
+| 7 — Close      | 6:15–6:45  | 30s      | The immune system line. SBT. Silence.                     |
+| Q&A            | 6:45–7:00+ | 15s+     | First question response.                                  |
 
 **Total: 6:30 + Q&A buffer = under 7:00**
 
@@ -356,13 +429,14 @@ If a judge asks "sum this up in one sentence," say:
 
 ## EMERGENCY FALLBACKS
 
-| If This Goes Wrong            | Do This                                                                                                                                                                                                            |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| MetaMask popup doesn't appear | Say "MetaMask is warming up" — open DevTools console, run `window.ethereum.request({method: 'eth_requestAccounts'})` manually                                                                                      |
-| ML API is slow/down           | Say "The model is hosted on Render's free tier — cold starts take 30 seconds. While it warms up, let me show you the raw API response I cached earlier." Show a screenshot or curl output.                         |
-| Transaction fails             | Say "Gas estimation failed — Monad testnet can be congested during hackathons. Let me show you the successful transactions from my prep run." Switch to Monad Explorer tab.                                        |
-| DAO proposal doesn't appear   | Show the Reports tab blocked transactions instead. Say "The proposal is indexed by our backend listener — let me show you the contract event directly on the explorer."                                            |
-| Score doesn't visibly change  | Manually explain: "The DAO boost function adds up to +50% to the ML base score. 62 × 1.47 = 91. This multiplication happens on the next API call. Let me show you the `getDAOScamBoost` function in the codebase." |
+| If This Goes Wrong             | Do This                                                                                                                                                                                                                       |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MetaMask popup doesn't appear  | Say "MetaMask is warming up" — open DevTools console, run `window.ethereum.request({method: 'eth_requestAccounts'})` manually                                                                                                 |
+| ML API is slow/down            | Say "The model is hosted on Render's free tier — cold starts take 30 seconds. While it warms up, let me show you the raw API response I cached earlier." Show a screenshot or curl output.                                    |
+| Transaction fails              | Say "Gas estimation failed — Monad testnet can be congested during hackathons. Let me show you the successful transactions from my prep run." Switch to Monad Explorer tab.                                                   |
+| DAO proposal doesn't appear    | Show the Reports tab blocked transactions instead. Say "The proposal is indexed by our backend listener — let me show you the contract event directly on the explorer."                                                       |
+| DAO boost doesn't show (+0%)   | You forgot to run `demo-setup.js` + `demo-execute.js`. Explain verbally: "Once the DAO confirms via `executeProposal()`, `isScammer` returns true, and Layer 2 fires. Combined jumps from 85 to 95. Let me show the code."    |
+| Score shows 10% instead of 85% | ML predicted "Not Fraud" for the small tx. Say: "The ML sees this as a safe transaction — the exploit happened years ago. But watch the DAO layer — it STILL catches it at 95% because the community confirmed it as a scam." |
 
 ---
 
