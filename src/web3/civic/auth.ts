@@ -477,7 +477,10 @@ export const calculateTrustScore = async (
   let baseScore = walletScore;
 
   // +30 for DAO voting accuracy (scale 0-100 → 0-30)
-  baseScore += Math.min(30, Math.floor(daoActivity.votingAccuracy * 30 / 100));
+  baseScore += Math.min(
+    30,
+    Math.floor((daoActivity.votingAccuracy * 30) / 100),
+  );
 
   // +30 for DAO participation (1 vote = 6 pts, max 30)
   baseScore += Math.min(30, daoActivity.participation * 6);

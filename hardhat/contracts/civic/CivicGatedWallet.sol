@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./CivicVerifier.sol";
+import "./WalletVerifier.sol";
 
 /**
  * @title CivicGatedWallet
- * @dev Wallet contract with Civic Pass verification for high-value transactions.
- * Transactions above the threshold require the sender to be Civic verified.
+ * @dev Wallet contract with on-chain wallet verification for high-value transactions.
+ * Transactions above the threshold require the sender to have a non-zero trust score.
  */
 contract CivicGatedWallet {
-    CivicVerifier public civicVerifier;
+    WalletVerifier public walletVerifier;
     uint256 public verificationThreshold;
     address public owner;
     
@@ -17,13 +17,13 @@ contract CivicGatedWallet {
     event ThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);
     
     /**
-     * @dev Initializes the contract with CivicVerifier address and a threshold amount
-     * @param _civicVerifierAddress The deployed CivicVerifier contract address
-     * @param _threshold Threshold amount above which Civic verification is required
+     * @dev Initializes the contract with WalletVerifier address and a threshold amount
+     * @param _walletVerifierAddress The deployed WalletVerifier contract address
+     * @param _threshold Threshold amount above which wallet verification is required
      */
-    constructor(address _civicVerifierAddress, uint256 _threshold) {
-        require(_civicVerifierAddress != address(0), "Invalid CivicVerifier address");
-        civicVerifier = CivicVerifier(_civicVerifierAddress);
+    constructor(address _walletVerifierAddress, uint256 _threshold) {
+        require(_walletVerifierAddress != address(0), "Invalid WalletVerifier address");
+        walletVerifier = WalletVerifier(_walletVerifierAddress);
         verificationThreshold = _threshold;
         owner = msg.sender;
     }
@@ -37,7 +37,7 @@ contract CivicGatedWallet {
     }
     
     /**
-     * @dev Updates the threshold amount for Civic verification
+     * @dev Updates the threshold amount for verification
      * @param _newThreshold New threshold amount
      */
     function updateThreshold(uint256 _newThreshold) external onlyOwner {
@@ -47,7 +47,7 @@ contract CivicGatedWallet {
     }
     
     /**
-     * @dev Executes a transaction, requiring Civic verification for amounts above threshold.
+     * @dev Executes a transaction, requiring wallet verification for amounts above threshold.
      * Only the owner can execute transactions from this wallet.
      * @param _to Recipient address
      * @param _value Transaction amount
@@ -60,9 +60,10 @@ contract CivicGatedWallet {
         bool requiresVerification = _value >= verificationThreshold;
         
         if (requiresVerification) {
+            (uint256 trustScore, , , , ) = walletVerifier.computeTrustScore(msg.sender);
             require(
-                civicVerifier.isVerified(msg.sender),
-                "CivicGatedWallet: Civic verification required for high-value transaction"
+                trustScore > 0,
+                "CivicGatedWallet: Wallet verification required for high-value transaction"
             );
         }
         
