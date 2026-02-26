@@ -142,7 +142,7 @@ contract CivicVerifier {
         uint256 _trustScore,
         uint256 _votingAccuracy,
         uint256 _doiParticipation
-    ) external {
+    ) external onlyCivicVerified {
         require(civicPass.isValid(_userAddress), "User not verified by CivicPass");
         require(_verificationLevel > 0 && _verificationLevel <= 3, "Invalid verification level");
 

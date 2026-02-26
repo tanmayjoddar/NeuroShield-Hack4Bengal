@@ -2,8 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Shield } from 'lucide-react';
-import { ethers } from 'ethers';
-import { GatewayProvider } from '@civic/solana-gateway-react';
 
 interface CivicAuthProps {
   onAuthSuccess: (token: string) => void;
@@ -15,7 +13,7 @@ interface CivicAuthProps {
 const CivicAuth: React.FC<CivicAuthProps> = ({ 
   onAuthSuccess, 
   onAuthError, 
-  clientId = process.env.VITE_CIVIC_CLIENT_ID,
+  clientId = import.meta.env.VITE_CIVIC_CLIENT_ID,
   walletAddress
 }) => {
   const [isLoading, setIsLoading] = useState(false);

@@ -9,23 +9,45 @@ async function main() {
   // In production, you would use the actual Civic Pass contract address
   const MockCivicPass = await ethers.getContractFactory("MockCivicPass");
   const mockCivicPass = await MockCivicPass.deploy();
-  await mockCivicPass.deployed();
-  console.log(`MockCivicPass deployed to: ${mockCivicPass.address}`);
+  await mockCivicPass.waitForDeployment();
+  const mockCivicPassAddr = await mockCivicPass.getAddress();
+  console.log(`MockCivicPass deployed to: ${mockCivicPassAddr}`);
 
-  // Deploy CivicVerifier
+  // Deploy CivicSBT (Soulbound Token)
+  const CivicSBT = await ethers.getContractFactory("CivicSBT");
+  const civicSBT = await CivicSBT.deploy();
+  await civicSBT.waitForDeployment();
+  const civicSBTAddr = await civicSBT.getAddress();
+  console.log(`CivicSBT deployed to: ${civicSBTAddr}`);
+
+  // Deploy CivicVerifier (requires both CivicPass + SBT addresses)
   const CivicVerifier = await ethers.getContractFactory("CivicVerifier");
-  const civicVerifier = await CivicVerifier.deploy(mockCivicPass.address);
-  await civicVerifier.deployed();
-  console.log(`CivicVerifier deployed to: ${civicVerifier.address}`);
+  const civicVerifier = await CivicVerifier.deploy(mockCivicPassAddr, civicSBTAddr);
+  await civicVerifier.waitForDeployment();
+  const civicVerifierAddr = await civicVerifier.getAddress();
+  console.log(`CivicVerifier deployed to: ${civicVerifierAddr}`);
 
-  // Deploy CivicGatedWallet with a threshold of 1 ETH (in wei)
-  const threshold = ethers.utils.parseEther("1.0");
+  // Authorize CivicVerifier as SBT updater so it can mint/update tokens
+  const addUpdaterTx = await civicSBT.addAuthorizedUpdater(civicVerifierAddr);
+  await addUpdaterTx.wait();
+  console.log(`CivicVerifier authorized as SBT updater`);
+
+  // Deploy CivicGatedWallet (needs CivicVerifier, NOT MockCivicPass)
+  const threshold = ethers.parseEther("1.0");
   const CivicGatedWallet = await ethers.getContractFactory("CivicGatedWallet");
-  const civicGatedWallet = await CivicGatedWallet.deploy(mockCivicPass.address, threshold);
-  await civicGatedWallet.deployed();
-  console.log(`CivicGatedWallet deployed to: ${civicGatedWallet.address}`);
+  const civicGatedWallet = await CivicGatedWallet.deploy(civicVerifierAddr, threshold);
+  await civicGatedWallet.waitForDeployment();
+  const civicGatedWalletAddr = await civicGatedWallet.getAddress();
+  console.log(`CivicGatedWallet deployed to: ${civicGatedWalletAddr}`);
 
-  console.log("Deployment completed!");
+  console.log("\nDeployment completed!");
+  console.log("─────────────────────────────────────");
+  console.log(`MockCivicPass:    ${mockCivicPassAddr}`);
+  console.log(`CivicSBT:         ${civicSBTAddr}`);
+  console.log(`CivicVerifier:    ${civicVerifierAddr}`);
+  console.log(`CivicGatedWallet: ${civicGatedWalletAddr}`);
+  console.log("─────────────────────────────────────");
+  console.log("\nSet VITE_CIVIC_VERIFIER_ADDRESS=" + civicVerifierAddr + " in your .env");
 }
 
 main()

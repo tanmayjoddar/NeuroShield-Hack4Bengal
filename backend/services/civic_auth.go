@@ -4,10 +4,13 @@ import (
 	"Wallet/backend/models"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 	"gorm.io/gorm"
 )
@@ -262,8 +265,8 @@ func (s *CivicAuthService) logVerificationAttempt(userAddress, verificationType 
 
 // Helper functions
 func generateDeviceHash(deviceInfo string) string {
-	// Implement device fingerprinting logic
-	return "hash_" + deviceInfo // Replace with actual hashing
+	h := sha256.Sum256([]byte(deviceInfo))
+	return hex.EncodeToString(h[:])
 }
 
 func calculateRiskScore(flags []string) float64 {
@@ -278,15 +281,29 @@ func calculateRiskScore(flags []string) float64 {
 			score += 0.2
 		}
 	}
+	if score > 1.0 {
+		score = 1.0
+	}
 	return score
 }
 
 func extractGeoLocation(deviceInfo string) string {
-	// Implement geo-location extraction
-	return "US" // Replace with actual implementation
+	// Parse locale/language part of the device info string for rough geo hint
+	// Device info format: "userAgent|language|screenSize" from frontend
+	parts := strings.Split(deviceInfo, "|")
+	if len(parts) >= 2 {
+		lang := parts[1]
+		// Extract country code from locale like "en-US" → "US"
+		if idx := strings.Index(lang, "-"); idx >= 0 {
+			return strings.ToUpper(lang[idx+1:])
+		}
+		return strings.ToUpper(lang)
+	}
+	return "UNKNOWN"
 }
 
 func extractIPAddress(deviceInfo string) string {
-	// Implement IP extraction
-	return "127.0.0.1" // Replace with actual implementation
+	// IP should be extracted from HTTP request headers, not device info
+	// This is a fallback; the handler should pass c.ClientIP() instead
+	return "0.0.0.0"
 }

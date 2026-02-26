@@ -57,12 +57,13 @@ func (h *CivicAuthHandler) VerifyGatepassHandler(c *gin.Context) {
 
 	session, err := h.civicService.VerifyGatepass(req.UserAddress, req.Gatepass, req.DeviceInfo)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": err.Error(),
-			"requiresAdditionalVerification": session != nil && session.Status == "needs_additional_verification",
-			"riskScore": session.RiskScore,
-			"securityFlags": session.Flags,
-		})
+		response := gin.H{"error": err.Error()}
+		if session != nil {
+			response["requiresAdditionalVerification"] = session.Status == "needs_additional_verification"
+			response["riskScore"] = session.RiskScore
+			response["securityFlags"] = session.Flags
+		}
+		c.JSON(http.StatusUnauthorized, response)
 		return
 	}
 

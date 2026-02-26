@@ -74,7 +74,7 @@ interface DualLayerResult {
 // ML API INTEGRATION (Layer 1 - Instant)
 // ════════════════════════════════════════════
 
-const ML_API_URL = 'https://ml-fraud-transaction-detection.onrender.com/predict'\;
+const ML_API_URL = 'https://ml-fraud-transaction-detection.onrender.com/predict';
 const ML_API_TIMEOUT = 10000; // 10 second timeout
 
 /**

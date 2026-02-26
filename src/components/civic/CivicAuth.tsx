@@ -141,7 +141,7 @@ const CivicAuth: React.FC<CivicAuthProps> = ({ address, onVerified }) => {
                 <div>
                   <h3 className="font-medium">{profile.name}</h3>
                   <p className="text-sm text-gray-500">
-                    Verified since {new Date(profile.activityStats.verifiedSince).toLocaleDateString()}
+                    Verified since {new Date(profile.joinedDate).toLocaleDateString()}
                   </p>
                 </div>
               </div>

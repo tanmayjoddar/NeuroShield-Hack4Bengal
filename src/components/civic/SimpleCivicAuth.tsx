@@ -30,17 +30,22 @@ const SimpleCivicAuth: React.FC<SimpleCivicAuthProps> = ({
     if (!walletAddress || !clientId) return;
 
     try {
-      // For demo, we'll consider addresses starting with "0x1" as verified
-      const mockVerified = walletAddress.toLowerCase().startsWith("0x1");
-      setIsVerified(mockVerified);
-
-      if (mockVerified) {
-        const mockGatewayToken = `civic_${Date.now()}_${walletAddress.slice(2, 8)}`;
-        onSuccess?.(mockGatewayToken);
+      // Check backend for existing verified session
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+      const res = await fetch(`${API_BASE}/api/auth/civic/status?userAddress=${walletAddress}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === 'verified' && new Date(data.expires) > new Date()) {
+          setIsVerified(true);
+          const token = `civic_${Date.now()}_${walletAddress.slice(2, 8)}`;
+          onSuccess?.(token);
+          return;
+        }
       }
+      setIsVerified(false);
     } catch (error) {
       console.error('Verification check failed:', error);
-      onError?.(error as Error);
+      setIsVerified(false);
     }
   };
 
@@ -56,14 +61,42 @@ const SimpleCivicAuth: React.FC<SimpleCivicAuthProps> = ({
 
     try {
       setIsLoading(true);
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
-      // Mock verification process - in production this would call Civic APIs
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Step 1: Initiate Civic auth session via backend
+      const deviceInfo = `${navigator.userAgent}|${navigator.language}|${screen.width}x${screen.height}`;
+      const initiateRes = await fetch(`${API_BASE}/api/auth/civic/initiate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userAddress: walletAddress, deviceInfo }),
+      });
 
-      const mockGatewayToken = `civic_${Date.now()}_${walletAddress.slice(2, 8)}`;
+      if (!initiateRes.ok) {
+        const err = await initiateRes.json().catch(() => ({ error: 'Failed to start verification' }));
+        throw new Error(err.error || 'Initiation failed');
+      }
+
+      const { gatepass } = await initiateRes.json();
+
+      // Step 2: Verify the gatepass via backend
+      const verifyRes = await fetch(`${API_BASE}/api/auth/civic/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userAddress: walletAddress, gatepass, deviceInfo }),
+      });
+
+      if (!verifyRes.ok) {
+        const err = await verifyRes.json().catch(() => ({ error: 'Verification failed' }));
+        if (err.requiresAdditionalVerification) {
+          throw new Error('Additional verification required due to high risk score');
+        }
+        throw new Error(err.error || 'Verification failed');
+      }
+
+      const gatewayToken = `civic_${Date.now()}_${walletAddress.slice(2, 8)}`;
       
       setIsVerified(true);
-      onSuccess?.(mockGatewayToken);
+      onSuccess?.(gatewayToken);
 
       toast({
         title: "Verification Successful",
