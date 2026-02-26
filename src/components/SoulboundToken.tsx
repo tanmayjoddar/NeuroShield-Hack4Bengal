@@ -378,7 +378,8 @@ const SoulboundToken: React.FC = () => {
                     Verification Level
                   </span>
                   <span className="text-white font-mono">
-                    {profile.metadata.verificationLevel} ({levelToString(profile.metadata.verificationLevel)})
+                    {profile.metadata.verificationLevel} (
+                    {levelToString(profile.metadata.verificationLevel)})
                   </span>
                 </div>
                 <div className="bg-gray-800 rounded-lg p-3">
@@ -398,17 +399,13 @@ const SoulboundToken: React.FC = () => {
                   </span>
                 </div>
                 <div className="bg-gray-800 rounded-lg p-3">
-                  <span className="text-gray-500 block text-xs">
-                    Issued At
-                  </span>
+                  <span className="text-gray-500 block text-xs">Issued At</span>
                   <span className="text-white font-mono text-xs">
                     {new Date(profile.metadata.issuedAt * 1000).toISOString()}
                   </span>
                 </div>
                 <div className="bg-gray-800 rounded-lg p-3">
-                  <span className="text-gray-500 block text-xs">
-                    Contract
-                  </span>
+                  <span className="text-gray-500 block text-xs">Contract</span>
                   <span className="text-green-400 font-mono text-xs">
                     {import.meta.env.VITE_CIVIC_SBT_ADDRESS?.slice(0, 10)}...
                   </span>

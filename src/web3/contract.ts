@@ -65,11 +65,13 @@ const CONTRACT_ADDRESSES: { [chainId: string]: string } = {
     "0x0000000000000000000000000000000000000000",
   "10143":
     import.meta.env.VITE_CONTRACT_ADDRESS_MONAD ||
-    "0x7A791fe5A35131B7d98f854a64E7f94180F27C7b", // Monad testnet address
+    (addresses as any).quadraticVoting ||
+    "0x0000000000000000000000000000000000000000", // Monad testnet — loaded from addresses.json
   // Fallback: some wallets/RPCs may report a different chain ID for Monad testnet
   "143":
     import.meta.env.VITE_CONTRACT_ADDRESS_MONAD ||
-    "0x7A791fe5A35131B7d98f854a64E7f94180F27C7b",
+    (addresses as any).quadraticVoting ||
+    "0x0000000000000000000000000000000000000000",
 };
 
 /**
@@ -79,7 +81,9 @@ class ContractService extends EventEmitter {
   private contractInstance: Contract | null = null;
 
   private QUADRATIC_VOTING_ADDRESS =
-    "0x7A791fe5A35131B7d98f854a64E7f94180F27C7b"; // Monad address
+    (addresses as any).quadraticVoting ||
+    import.meta.env.VITE_CONTRACT_ADDRESS_MONAD ||
+    "0x0000000000000000000000000000000000000000"; // loaded from addresses.json
   private SHIELD_TOKEN_ADDRESS =
     (addresses as any).shieldToken ||
     import.meta.env.VITE_SHIELD_TOKEN_ADDRESS ||
@@ -87,6 +91,11 @@ class ContractService extends EventEmitter {
 
   private votingContract: ethers.Contract | null = null;
   private shieldToken: ethers.Contract | null = null;
+
+  /** Public getter so UI components can display the contract address */
+  getContractAddress(): string {
+    return this.QUADRATIC_VOTING_ADDRESS;
+  }
 
   private async getSignerContract() {
     if (!this.votingContract) {
@@ -221,10 +230,7 @@ class ContractService extends EventEmitter {
             "— read-only mode. Reports/votes will fail.",
           );
         } else {
-          console.warn(
-            "Could not verify contract owner (non-fatal):",
-            error,
-          );
+          console.warn("Could not verify contract owner (non-fatal):", error);
         }
         // Don't throw — contract may still work for read/write operations
       }
@@ -254,10 +260,7 @@ class ContractService extends EventEmitter {
             "[Contract] shieldToken() returned 0x — contract not deployed. SHIELD token disabled.",
           );
         } else {
-          console.warn(
-            "Could not initialize SHIELD token (non-fatal):",
-            error,
-          );
+          console.warn("Could not initialize SHIELD token (non-fatal):", error);
         }
       }
 

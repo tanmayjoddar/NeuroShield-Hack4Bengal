@@ -118,7 +118,7 @@ func NewEventListenerService(db *gorm.DB) (*EventListenerService, error) {
 
 	contractAddrStr := os.Getenv("QUADRATIC_VOTING_ADDRESS")
 	if contractAddrStr == "" {
-		contractAddrStr = "0x7A791FE5A35131B7D98F854A64e7F94180F27C7B"
+		contractAddrStr = "0xC9755c1Be2c467c17679CeB5d379eF853641D846"
 	}
 
 	parsed, err := abi.JSON(strings.NewReader(quadraticVotingABI))

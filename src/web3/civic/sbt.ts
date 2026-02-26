@@ -20,6 +20,7 @@ import { ethers, Contract, BrowserProvider, JsonRpcProvider } from "ethers";
 import CivicSBTABI from "../abi/CivicSBT.json";
 import CivicVerifierABI from "../abi/CivicVerifier.json";
 import walletConnector from "../wallet";
+import addresses from "../addresses.json";
 
 // ════════════════════════════════════════════
 // TYPES
@@ -77,7 +78,10 @@ const QV_ABI = [
   "function voterAccuracy(address) view returns (uint256)",
   "function voterParticipation(address) view returns (uint256)",
 ];
-const QV_ADDRESS = "0x7A791fe5A35131B7d98f854a64E7f94180F27C7b";
+const QV_ADDRESS =
+  (addresses as any).quadraticVoting ||
+  import.meta.env.VITE_CONTRACT_ADDRESS_MONAD ||
+  "0x0000000000000000000000000000000000000000"; // loaded from addresses.json after deploy
 
 // ════════════════════════════════════════════
 // HELPERS

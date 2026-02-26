@@ -33,7 +33,7 @@ When you send to it during the demo, the dual-layer UI will show the DAO boost.
 
 - [ ] Open `localhost:5173` in Chrome — dashboard visible, wallet **NOT** connected yet
 - [ ] MetaMask ready with Monad Testnet (Chain ID 10143), has MON for gas
-- [ ] Open a second browser tab: Monad Explorer at `https://testnet.monadexplorer.com/address/0x7A791fe5A35131B7d98f854a64E7f94180F27C7b`
+- [ ] Open a second browser tab: Monad Explorer at `https://testnet.monadexplorer.com/address/0xC9755c1Be2c467c17679CeB5d379eF853641D846`
 - [ ] Open a terminal window (small, bottom-right) tailing the backend event logs:
   ```
   curl -s http://localhost:8080/api/health | jq

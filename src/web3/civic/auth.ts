@@ -4,6 +4,7 @@
 
 import { ethers } from "ethers";
 import walletConnector from "../wallet";
+import addresses from "../addresses.json";
 import {
   getOnChainMetadata,
   decomposeOnChainTrustScore,
@@ -67,7 +68,10 @@ const QUADRATIC_VOTING_ABI = [
 // Contract addresses (loaded from env or defaults for Monad testnet)
 const CIVIC_VERIFIER_ADDRESS =
   import.meta.env.VITE_CIVIC_VERIFIER_ADDRESS || "";
-const QUADRATIC_VOTING_ADDRESS = "0x7A791fe5A35131B7d98f854a64E7f94180F27C7b";
+const QUADRATIC_VOTING_ADDRESS =
+  (addresses as any).quadraticVoting ||
+  import.meta.env.VITE_CONTRACT_ADDRESS_MONAD ||
+  "0x0000000000000000000000000000000000000000"; // loaded from addresses.json after deploy
 
 // ════════════════════════════════════════════
 // HELPER: Get contract instances

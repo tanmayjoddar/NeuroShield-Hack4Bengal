@@ -20,14 +20,14 @@ const MONADSCAN_API_KEY = process.env.MONADSCAN_API_KEY || "";
 const config: HardhatUserConfig = {
   solidity: "0.8.28",
   defaultNetwork: "monad_testnet",
-  networks: {    
+  networks: {
     monad_testnet: {
       url: "https://testnet-rpc.monad.xyz",  // Latest Monad testnet RPC
       accounts: [PRIVATE_KEY],      chainId: 10143,  // Monad Local testnet chain ID
-      gasPrice: 1000000000, // 1 gwei
-      timeout: 60000 // 1 minute timeout
+      // gasPrice: auto-estimated by the network
+      timeout: 120000 // 2 minute timeout
     }
-  },  
+  },
   etherscan: {
     apiKey: {
       monad_testnet: process.env.MONADSCAN_API_KEY || ""

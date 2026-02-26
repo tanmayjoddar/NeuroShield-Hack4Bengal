@@ -31,7 +31,7 @@ async function main() {
   console.log("✅ Social Recovery contract deployed to:", contractAddress);
 
   // Save the contract address
-  const addressesPath = path.join(__dirname, "../src/web3/addresses.json");
+  const addressesPath = path.join(__dirname, "../../src/web3/addresses.json");
   let addresses = {};
   
   try {
