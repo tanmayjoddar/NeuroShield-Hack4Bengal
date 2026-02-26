@@ -62,11 +62,9 @@ const CONTRACT_ADDRESSES: { [chainId: string]: string } = {
   "11155111":
     import.meta.env.VITE_CONTRACT_ADDRESS_SEPOLIA ||
     "0x0000000000000000000000000000000000000000",
-  "2023":
+  "10143":
     import.meta.env.VITE_CONTRACT_ADDRESS_MONAD ||
     "0x7A791FE5A35131B7D98F854A64e7F94180F27C7B", // Monad testnet address
-  "10143": "0x7A791FE5A35131B7D98F854A64e7F94180F27C7B", // Monad testnet address
-  // Add more networks as needed
 };
 
 /**
@@ -86,7 +84,7 @@ class ContractService extends EventEmitter {
   private shieldToken: ethers.Contract | null = null;
 
   private async getSignerContract() {
-    if (!this.votingContract || !this.shieldToken) {
+    if (!this.votingContract) {
       await this.init();
     }
     return {
@@ -158,10 +156,28 @@ class ContractService extends EventEmitter {
         const owner = await this.votingContract.owner();
         console.log("Contract verified, owner:", owner);
       } catch (error) {
-        console.error("Error verifying contract:", error);
-        throw new Error(
-          "Could not verify contract deployment. Please check the contract address.",
-        );
+        console.warn("Could not verify contract owner (non-fatal):", error);
+        // Don't throw — contract may still work for read/write operations
+      }
+
+      // Initialize SHIELD token contract from on-chain address
+      try {
+        const shieldTokenAddress = await this.votingContract.shieldToken();
+        if (shieldTokenAddress && shieldTokenAddress !== ethers.ZeroAddress) {
+          this.SHIELD_TOKEN_ADDRESS = shieldTokenAddress;
+          this.shieldToken = new ethers.Contract(
+            shieldTokenAddress,
+            SHIELD_TOKEN_ABI,
+            walletConnector.signer,
+          );
+          console.log("SHIELD token initialized at:", shieldTokenAddress);
+        } else {
+          console.warn(
+            "SHIELD token address is zero — token features disabled",
+          );
+        }
+      } catch (error) {
+        console.warn("Could not initialize SHIELD token (non-fatal):", error);
       }
 
       // Set up event forwarding
@@ -169,6 +185,7 @@ class ContractService extends EventEmitter {
 
       console.log("Contract initialization complete:", {
         votingAddress: this.QUADRATIC_VOTING_ADDRESS,
+        shieldTokenAddress: this.SHIELD_TOKEN_ADDRESS,
         chainId,
         initialized: true,
       });
@@ -445,12 +462,23 @@ class ContractService extends EventEmitter {
 
   // Shield Token Functions
   public async getShieldBalance(address: string): Promise<string> {
-    if (!this.shieldToken) await this.init();
-    return this.shieldToken?.balanceOf(address);
+    if (!this.votingContract) await this.init();
+    if (!this.shieldToken) {
+      console.warn("SHIELD token not initialized — returning 0");
+      return "0";
+    }
+    try {
+      const balance = await this.shieldToken.balanceOf(address);
+      return formatUnits(balance, 18);
+    } catch (error) {
+      console.warn("Failed to get SHIELD balance:", error);
+      return "0";
+    }
   }
 
   public async needsShieldApproval(amount: string): Promise<boolean> {
-    if (!this.shieldToken || !walletConnector.address) await this.init();
+    if (!this.votingContract) await this.init();
+    if (!this.shieldToken || !walletConnector.address) return true;
 
     const allowance = await this.shieldToken?.allowance(
       walletConnector.address,
@@ -464,6 +492,9 @@ class ContractService extends EventEmitter {
     amount: string,
   ): Promise<ethers.ContractTransactionResponse> {
     const { shield } = await this.getSignerContract();
+    if (!shield) {
+      throw new Error("SHIELD token not available on this network");
+    }
     return shield.approve(this.QUADRATIC_VOTING_ADDRESS, amount);
   }
 
@@ -471,33 +502,67 @@ class ContractService extends EventEmitter {
   public async getScamReports(): Promise<any[]> {
     if (!this.votingContract) await this.init();
 
-    const filter = this.votingContract?.filters.ProposalCreated();
-    const events = await this.votingContract?.queryFilter(filter);
+    try {
+      // Use proposalCount + getProposal to fetch all proposals
+      const count = await this.votingContract?.proposalCount();
+      const totalProposals = Number(count || 0);
 
-    const reports = await Promise.all(
-      events?.map(async (event) => {
-        const proposalId = (event as ethers.EventLog).args?.[0];
-        const proposal = await this.votingContract?.getProposal(proposalId);
+      if (totalProposals === 0) return [];
 
-        return {
-          id: Number(proposalId),
-          reporter: proposal.reporter,
-          suspiciousAddress: proposal.suspiciousAddress,
-          description: proposal.description,
-          evidence: proposal.evidence,
-          timestamp: new Date(), // TODO: Get from event block timestamp
-          votesFor: proposal.votesFor.toString(),
-          votesAgainst: proposal.votesAgainst.toString(),
-          status: proposal.isActive
-            ? "active"
-            : proposal.votesFor > proposal.votesAgainst
-              ? "approved"
-              : "rejected",
-        };
-      }) || [],
-    );
+      const reports = [];
+      for (let i = 1; i <= totalProposals; i++) {
+        try {
+          const proposal = await this.votingContract?.getProposal(i);
+          reports.push({
+            id: i,
+            reporter: proposal.reporter || proposal[0],
+            suspiciousAddress: proposal.suspiciousAddress || proposal[1],
+            description: proposal.description || proposal[2],
+            evidence: proposal.evidence || proposal[3],
+            timestamp: new Date(),
+            votesFor: (proposal.votesFor || proposal[4]).toString(),
+            votesAgainst: (proposal.votesAgainst || proposal[5]).toString(),
+            status:
+              (proposal.isActive ?? proposal[6])
+                ? "active"
+                : BigInt(proposal.votesFor || proposal[4]) >
+                    BigInt(proposal.votesAgainst || proposal[5])
+                  ? "approved"
+                  : "rejected",
+          });
+        } catch (err) {
+          console.warn(`Failed to fetch proposal ${i}:`, err);
+        }
+      }
 
-    return reports;
+      return reports;
+    } catch (error) {
+      console.error("Error fetching scam reports:", error);
+
+      // Fallback: try event-based approach
+      try {
+        const filter = this.votingContract?.filters.ProposalCreated();
+        const events = await this.votingContract?.queryFilter(filter);
+
+        return (events || []).map((event, index) => {
+          const args = (event as ethers.EventLog).args;
+          return {
+            id: Number(args?.[0] || index + 1),
+            reporter: args?.[1] || "unknown",
+            suspiciousAddress: args?.[2] || "unknown",
+            description: args?.[3] || "Scam report",
+            evidence: args?.[4] || "",
+            timestamp: new Date(),
+            votesFor: "0",
+            votesAgainst: "0",
+            status: "active",
+          };
+        });
+      } catch (fallbackErr) {
+        console.error("Event fallback also failed:", fallbackErr);
+        return [];
+      }
+    }
   }
 
   public async castQuadraticVote(
@@ -534,8 +599,8 @@ class ContractService extends EventEmitter {
       const network = await walletConnector.provider?.getNetwork();
       const chainId = Number(network?.chainId || 0);
 
-      if (chainId !== 10143 && chainId !== 2023) {
-        throw new Error("Please switch to Monad network");
+      if (chainId !== 10143) {
+        throw new Error("Please switch to Monad network (chain ID 10143)");
       }
 
       console.log("Network info:", {
@@ -631,7 +696,12 @@ class ContractService extends EventEmitter {
 
   public async isScamAddress(address: string): Promise<boolean> {
     if (!this.votingContract) await this.init();
-    return this.votingContract?.isScammer(address);
+    try {
+      return await this.votingContract?.isScammer(address);
+    } catch (error) {
+      console.warn("isScammer check failed (non-fatal):", error);
+      return false;
+    }
   }
 
   public async getScamScore(address: string): Promise<number> {
@@ -836,7 +906,7 @@ async function resolveAddressOrENS(
     const chainId = Number(network.chainId); // Convert bigint to number for comparison
 
     // Immediately return for non-ENS networks to avoid unnecessary ENS calls
-    if (chainId === 2023 || chainId === 10143) {
+    if (chainId === 10143) {
       throw new Error("Only valid addresses are supported on this network");
     }
 
@@ -879,7 +949,7 @@ export const getQuadraticVotingContract = async (
       const network = await provider.getNetwork();
       const chainId = Number(network.chainId);
 
-      if (chainId === 10143 || chainId === 2023) {
+      if (chainId === 10143) {
         if (!isValidAddress(suspiciousAddress)) {
           throw new Error("Please enter a valid address");
         }

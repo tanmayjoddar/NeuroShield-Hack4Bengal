@@ -2,21 +2,7 @@
   "abi": [
     {
       "inputs": [
-        {
-          "internalType": "address",
-          "name": "_shieldToken",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "_civicVerifier",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "_civicSBT",
-          "type": "address"
-        }
+        { "internalType": "address", "name": "_shieldToken", "type": "address" }
       ],
       "stateMutability": "nonpayable",
       "type": "constructor"
@@ -39,8 +25,20 @@
         {
           "indexed": true,
           "internalType": "address",
-          "name": "target",
+          "name": "suspiciousAddress",
           "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "evidence",
+          "type": "string"
         }
       ],
       "name": "ProposalCreated",
@@ -70,6 +68,25 @@
       "inputs": [
         {
           "indexed": true,
+          "internalType": "address",
+          "name": "scamAddress",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "score",
+          "type": "uint256"
+        }
+      ],
+      "name": "ScamAddressConfirmed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
           "internalType": "uint256",
           "name": "proposalId",
           "type": "uint256"
@@ -89,7 +106,13 @@
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "weight",
+          "name": "tokens",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "power",
           "type": "uint256"
         }
       ],
@@ -100,73 +123,135 @@
       "inputs": [
         {
           "internalType": "address",
-          "name": "voter",
+          "name": "_suspiciousAddress",
           "type": "address"
-        }
+        },
+        { "internalType": "string", "name": "_description", "type": "string" },
+        { "internalType": "string", "name": "_evidence", "type": "string" }
       ],
-      "name": "calculateVotingPower",
+      "name": "submitProposal",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "_proposalId", "type": "uint256" },
+        { "internalType": "bool", "name": "_support", "type": "bool" },
+        { "internalType": "uint256", "name": "_tokens", "type": "uint256" }
+      ],
+      "name": "castVote",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "_proposalId", "type": "uint256" }
+      ],
+      "name": "executeProposal",
+      "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "proposalId", "type": "uint256" }
+      ],
+      "name": "getProposal",
       "outputs": [
+        { "internalType": "address", "name": "reporter", "type": "address" },
         {
-          "components": [
-            {
-              "internalType": "uint256",
-              "name": "base",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "bonus",
-              "type": "uint256"
-            }
-          ],
-          "internalType": "struct QuadraticVoting.VotingPower",
-          "name": "",
-          "type": "tuple"
-        }
+          "internalType": "address",
+          "name": "suspiciousAddress",
+          "type": "address"
+        },
+        { "internalType": "string", "name": "description", "type": "string" },
+        { "internalType": "string", "name": "evidence", "type": "string" },
+        { "internalType": "uint256", "name": "votesFor", "type": "uint256" },
+        {
+          "internalType": "uint256",
+          "name": "votesAgainst",
+          "type": "uint256"
+        },
+        { "internalType": "bool", "name": "isActive", "type": "bool" }
       ],
       "stateMutability": "view",
       "type": "function"
     },
     {
       "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "proposalId",
-          "type": "uint256"
-        },
-        {
-          "internalType": "bool",
-          "name": "support",
-          "type": "bool"
-        }
+        { "internalType": "uint256", "name": "proposalId", "type": "uint256" },
+        { "internalType": "address", "name": "voter", "type": "address" }
       ],
-      "name": "castVote",
-      "outputs": [],
-      "stateMutability": "nonpayable",
+      "name": "getVote",
+      "outputs": [
+        { "internalType": "bool", "name": "hasVoted", "type": "bool" },
+        { "internalType": "bool", "name": "support", "type": "bool" },
+        { "internalType": "uint256", "name": "tokens", "type": "uint256" },
+        { "internalType": "uint256", "name": "power", "type": "uint256" }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
       "inputs": [
-        {
-          "internalType": "address",
-          "name": "target",
-          "type": "address"
-        },
-        {
-          "internalType": "string",
-          "name": "evidence",
-          "type": "string"
-        }
+        { "internalType": "address", "name": "voter", "type": "address" }
       ],
-      "name": "createProposal",
+      "name": "getVoterStats",
       "outputs": [
+        { "internalType": "uint256", "name": "accuracy", "type": "uint256" },
         {
           "internalType": "uint256",
-          "name": "",
+          "name": "participation",
           "type": "uint256"
         }
       ],
-      "stateMutability": "nonpayable",
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "proposalCount",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "shieldToken",
+      "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
+      "name": "isScammer",
+      "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
+      "name": "scamScore",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "uint256", "name": "proposalId", "type": "uint256" }
+      ],
+      "name": "getProposalVoterCount",
+      "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+      "stateMutability": "view",
       "type": "function"
     }
   ]

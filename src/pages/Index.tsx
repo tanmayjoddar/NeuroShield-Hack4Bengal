@@ -31,6 +31,7 @@ import { useCivicStore } from "@/stores/civicStore";
 import SimpleCivicAuth from "@/components/civic/SimpleCivicAuth";
 import MEVProtectionTester from "@/components/MEVProtectionTester";
 import SoulboundToken from "@/components/SoulboundToken";
+import { reportScam } from "@/web3/contract";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -51,6 +52,12 @@ const Index = () => {
   const [aiScansToday, setAiScansToday] = useState(0);
   const [blockedThreats, setBlockedThreats] = useState(0);
   const [savedAmount, setSavedAmount] = useState(0);
+
+  // Report form state
+  const [reportAddress, setReportAddress] = useState("");
+  const [reportDescription, setReportDescription] = useState("");
+  const [reportEvidence, setReportEvidence] = useState("");
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
   // New gamification states
   const [securityScore, setSecurityScore] = useState(0);
@@ -232,15 +239,55 @@ const Index = () => {
     });
   };
 
-  const handleThreatReport = () => {
-    setSecurityScore((prev) => Math.min(100, prev + 5));
-    setLastAction("report");
-    setShowAIFeedback(true);
+  const handleThreatReport = async () => {
+    if (!reportAddress.trim()) {
+      toast({
+        title: " Address Required",
+        description: "Enter the suspicious wallet address to report.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!reportDescription.trim()) {
+      toast({
+        title: " Description Required",
+        description: "Describe why this address is suspicious.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    toast({
-      title: "📊 Report Submitted",
-      description: "Thank you for helping secure the Web3 community!",
-    });
+    setIsSubmittingReport(true);
+    try {
+      const txHash = await reportScam(
+        reportAddress.trim(),
+        reportDescription.trim(),
+        reportEvidence.trim(),
+      );
+
+      setSecurityScore((prev) => Math.min(100, prev + 5));
+      setLastAction("report");
+      setShowAIFeedback(true);
+
+      // Clear form
+      setReportAddress("");
+      setReportDescription("");
+      setReportEvidence("");
+
+      toast({
+        title: "✅ Report Submitted On-Chain",
+        description: `Tx: ${txHash.slice(0, 10)}...${txHash.slice(-8)} — DAO voting is now open.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "❌ Report Failed",
+        description:
+          error.message || "Could not submit report. Check wallet connection.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmittingReport(false);
+    }
   };
 
   const handleCivicSuccess = (gatewayToken: string) => {
@@ -802,25 +849,64 @@ const Index = () => {
                         })()}
                       </div>
                     </div>
-                    {/* Enhanced submit button */}
+                    {/* Enhanced submit form */}
                     <div className="group/card p-4 bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 transition-all duration-300 hover:scale-[1.02]">
                       <h4 className="text-white font-medium mb-4 flex items-center gap-2">
                         <span>Submit New Report</span>
                         <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
                       </h4>
-                      <Button
-                        className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-600 hover:to-purple-700 text-white transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-cyan-500/20 rounded-xl py-3"
-                        onClick={handleThreatReport}
-                      >
-                        <span className="flex items-center justify-center gap-2">
-                          <span className="text-lg">
-                            Report Suspicious Activity
+                      <div className="space-y-3">
+                        <input
+                          type="text"
+                          placeholder="Suspicious wallet address (0x...)"
+                          value={reportAddress}
+                          onChange={(e) => setReportAddress(e.target.value)}
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 font-mono"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Description — why is this address suspicious?"
+                          value={reportDescription}
+                          onChange={(e) => setReportDescription(e.target.value)}
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Evidence URL or IPFS hash (optional)"
+                          value={reportEvidence}
+                          onChange={(e) => setReportEvidence(e.target.value)}
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                        />
+                        <Button
+                          className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-600 hover:to-purple-700 text-white transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-cyan-500/20 rounded-xl py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                          onClick={handleThreatReport}
+                          disabled={
+                            isSubmittingReport ||
+                            !reportAddress.trim() ||
+                            !reportDescription.trim()
+                          }
+                        >
+                          <span className="flex items-center justify-center gap-2">
+                            {isSubmittingReport ? (
+                              <>
+                                <span className="animate-spin">⏳</span>
+                                <span className="text-lg">
+                                  Submitting to Blockchain...
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-lg">
+                                  Report Suspicious Activity
+                                </span>
+                                <span className="text-sm bg-white/20 px-2 py-1 rounded-full group-hover/card:animate-pulse">
+                                  +5 Points
+                                </span>
+                              </>
+                            )}
                           </span>
-                          <span className="text-sm bg-white/20 px-2 py-1 rounded-full group-hover/card:animate-pulse">
-                            +5 Points
-                          </span>
-                        </span>
-                      </Button>
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
