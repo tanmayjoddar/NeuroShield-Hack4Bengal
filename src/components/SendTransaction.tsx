@@ -805,8 +805,9 @@ const SendTransaction: React.FC<SendTransactionProps> = ({
 
                 <div className="text-xs text-gray-400 space-y-1">
                   <div>
-                    📊 <strong className="text-gray-300">Real Data Ready:</strong> When you submit, the
-                    system will fetch:
+                    📊{" "}
+                    <strong className="text-gray-300">Real Data Ready:</strong>{" "}
+                    When you submit, the system will fetch:
                   </div>
                   <ul className="ml-4 space-y-1">
                     <li>• Your wallet balance and transaction history</li>

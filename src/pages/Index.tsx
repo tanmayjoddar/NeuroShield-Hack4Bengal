@@ -70,7 +70,7 @@ const Index = () => {
   useEffect(() => {
     const loadRealStats = () => {
       try {
-        const raw = localStorage.getItem('transaction-logs');
+        const raw = localStorage.getItem("transaction-logs");
         const logs: Array<{
           timestamp: string;
           to: string;
@@ -84,7 +84,7 @@ const Index = () => {
         setAiScansToday(logs.length);
 
         // Blocked threats
-        const blocked = logs.filter(l => l.blocked);
+        const blocked = logs.filter((l) => l.blocked);
         setBlockedThreats(blocked.length);
 
         // Saved amount = sum of values from blocked txs (displayed as USD estimate)
@@ -99,15 +99,15 @@ const Index = () => {
 
         // Shield level
         const s = baseScore + blockBonus + activityBonus;
-        if (s >= 90) setShieldLevel('Guardian Elite');
-        else if (s >= 75) setShieldLevel('Shield Master');
-        else if (s >= 60) setShieldLevel('Defender');
-        else if (s >= 40) setShieldLevel('Guardian');
-        else setShieldLevel('Rookie');
+        if (s >= 90) setShieldLevel("Guardian Elite");
+        else if (s >= 75) setShieldLevel("Shield Master");
+        else if (s >= 60) setShieldLevel("Defender");
+        else if (s >= 40) setShieldLevel("Guardian");
+        else setShieldLevel("Rookie");
 
         // Last suspicious address from blocked txs
         if (blocked.length > 0) {
-          setSuspiciousAddress(blocked[0].to || '');
+          setSuspiciousAddress(blocked[0].to || "");
         }
       } catch {
         // Safe defaults if localStorage fails
@@ -116,8 +116,9 @@ const Index = () => {
 
     loadRealStats();
     // Refresh when new transactions are logged
-    window.addEventListener('transaction-logged', loadRealStats);
-    return () => window.removeEventListener('transaction-logged', loadRealStats);
+    window.addEventListener("transaction-logged", loadRealStats);
+    return () =>
+      window.removeEventListener("transaction-logged", loadRealStats);
   }, []);
 
   // Reset threat level after some time for demo purposes
@@ -419,7 +420,7 @@ const Index = () => {
               <div className="flex flex-wrap gap-4 justify-center lg:justify-start animate-fade-in-up animation-delay-300">
                 <Button
                   className="bg-cyan-500 hover:bg-cyan-600 text-white px-8 py-6 text-lg rounded-xl transition-all hover:scale-105"
-                  onClick={() => navigate('/send')}
+                  onClick={() => navigate("/send")}
                 >
                   Send Tokens
                 </Button>
@@ -441,7 +442,9 @@ const Index = () => {
                   ))}
                 </div>
                 <div className="text-left">
-                  <div className="text-2xl font-bold text-white">{aiScansToday}</div>
+                  <div className="text-2xl font-bold text-white">
+                    {aiScansToday}
+                  </div>
                   <div className="text-gray-400">Transactions Scanned</div>
                 </div>
               </div>
@@ -494,25 +497,41 @@ const Index = () => {
                       </div>
                     </div>
                     <div className="space-y-3">
-                      <div className="text-xs text-gray-400 uppercase tracking-wider">Wallet</div>
-                      <div className="text-sm text-white font-mono">
-                        {currentAddress ? `${currentAddress.slice(0, 6)}...${currentAddress.slice(-4)}` : 'Not Connected'}
+                      <div className="text-xs text-gray-400 uppercase tracking-wider">
+                        Wallet
                       </div>
-                      <div className="text-xs text-gray-400 uppercase tracking-wider mt-3">Shield Level</div>
-                      <div className="text-sm text-cyan-400 font-medium">{shieldLevel}</div>
+                      <div className="text-sm text-white font-mono">
+                        {currentAddress
+                          ? `${currentAddress.slice(0, 6)}...${currentAddress.slice(-4)}`
+                          : "Not Connected"}
+                      </div>
+                      <div className="text-xs text-gray-400 uppercase tracking-wider mt-3">
+                        Shield Level
+                      </div>
+                      <div className="text-sm text-cyan-400 font-medium">
+                        {shieldLevel}
+                      </div>
                     </div>
                     <div className="mt-auto">
                       <div className="grid grid-cols-3 gap-4 text-center">
                         <div className="p-2 bg-white/5 rounded-lg">
-                          <div className="text-sm font-bold text-white">{aiScansToday}</div>
+                          <div className="text-sm font-bold text-white">
+                            {aiScansToday}
+                          </div>
                           <div className="text-[10px] text-gray-400">Scans</div>
                         </div>
                         <div className="p-2 bg-white/5 rounded-lg">
-                          <div className="text-sm font-bold text-white">{blockedThreats}</div>
-                          <div className="text-[10px] text-gray-400">Blocked</div>
+                          <div className="text-sm font-bold text-white">
+                            {blockedThreats}
+                          </div>
+                          <div className="text-[10px] text-gray-400">
+                            Blocked
+                          </div>
                         </div>
                         <div className="p-2 bg-white/5 rounded-lg">
-                          <div className="text-sm font-bold text-white">{securityScore}</div>
+                          <div className="text-sm font-bold text-white">
+                            {securityScore}
+                          </div>
                           <div className="text-[10px] text-gray-400">Score</div>
                         </div>
                       </div>
@@ -740,28 +759,45 @@ const Index = () => {
                       <div className="text-sm text-gray-400 space-y-3">
                         {(() => {
                           try {
-                            const rawLogs = localStorage.getItem('transaction-logs');
+                            const rawLogs =
+                              localStorage.getItem("transaction-logs");
                             const logs = rawLogs ? JSON.parse(rawLogs) : [];
-                            const blocked = logs.filter((l: any) => l.blocked).slice(0, 3);
+                            const blocked = logs
+                              .filter((l: any) => l.blocked)
+                              .slice(0, 3);
                             if (blocked.length === 0) {
                               return (
                                 <div className="text-center py-4 text-gray-500">
-                                  No blocked transactions yet. Use the AI Demo or send a transaction to see real reports here.
+                                  No blocked transactions yet. Use the AI Demo
+                                  or send a transaction to see real reports
+                                  here.
                                 </div>
                               );
                             }
                             return blocked.map((log: any, i: number) => (
-                              <div key={i} className="flex justify-between items-center p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
+                              <div
+                                key={i}
+                                className="flex justify-between items-center p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                              >
                                 <span className="group-hover/card:text-white transition-colors font-mono text-xs">
-                                  {log.to ? `${log.to.slice(0, 6)}...${log.to.slice(-4)}` : 'Unknown'}
+                                  {log.to
+                                    ? `${log.to.slice(0, 6)}...${log.to.slice(-4)}`
+                                    : "Unknown"}
                                 </span>
-                                <Badge className={`${log.riskLevel === 'High' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
-                                  {log.riskLevel || 'Medium'} Risk — {(log.riskScore || 0).toFixed(0)}%
+                                <Badge
+                                  className={`${log.riskLevel === "High" ? "bg-red-500/20 text-red-400" : "bg-yellow-500/20 text-yellow-400"}`}
+                                >
+                                  {log.riskLevel || "Medium"} Risk —{" "}
+                                  {(log.riskScore || 0).toFixed(0)}%
                                 </Badge>
                               </div>
                             ));
                           } catch {
-                            return <div className="text-gray-500">No reports available</div>;
+                            return (
+                              <div className="text-gray-500">
+                                No reports available
+                              </div>
+                            );
                           }
                         })()}
                       </div>
@@ -935,7 +971,9 @@ const Index = () => {
                           Enable AI-powered transaction scanning
                         </p>
                       </div>
-                      <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Active</Badge>
+                      <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                        Active
+                      </Badge>
                     </div>
                     <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
                       <div>
@@ -946,7 +984,9 @@ const Index = () => {
                           Automatically block transactions with 90%+ risk score
                         </p>
                       </div>
-                      <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Active</Badge>
+                      <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                        Active
+                      </Badge>
                     </div>
                     <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
                       <div>
@@ -957,7 +997,9 @@ const Index = () => {
                           Show warnings from community-reported contracts
                         </p>
                       </div>
-                      <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Active</Badge>
+                      <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                        Active
+                      </Badge>
                     </div>
                   </div>
                 </CardContent>

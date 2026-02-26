@@ -1,29 +1,41 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
-import { Loader2, AlertCircle, Activity } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import walletConnector from '@/web3/wallet';
-import { formatUnits } from 'ethers';
+import React, { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from "recharts";
+import { Loader2, AlertCircle, Activity } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import walletConnector from "@/web3/wallet";
+import { formatUnits } from "ethers";
 
 interface WalletAnalytics {
   // Basic transaction timing metrics
   avg_min_between_sent_tx: number;
   avg_min_between_received_tx: number;
   time_diff_first_last_mins: number;
-  
+
   // Transaction counts
   sent_tx_count: number;
   received_tx_count: number;
   created_contracts_count: number;
-  
+
   // ETH value metrics
   max_value_received: string;
   avg_value_received: string;
   avg_value_sent: string;
   total_ether_sent: string;
   total_ether_balance: string;
-  
+
   // ERC20 token metrics
   erc20_total_ether_received: string;
   erc20_total_ether_sent: string;
@@ -32,7 +44,7 @@ interface WalletAnalytics {
   erc20_uniq_rec_token_name: number;
   erc20_most_sent_token_type: string;
   erc20_most_rec_token_type: string;
-  
+
   // Derived metrics
   txn_frequency: number;
   avg_txn_value: string;
@@ -53,10 +65,10 @@ const WalletAnalytics: React.FC<WalletAnalyticsProps> = ({ walletAddress }) => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        
+
         const provider = walletConnector.provider;
         const address = walletAddress || walletConnector.address;
-        
+
         if (!provider || !address) {
           setError("Connect your wallet to view analytics");
           setLoading(false);
@@ -66,7 +78,7 @@ const WalletAnalytics: React.FC<WalletAnalyticsProps> = ({ walletAddress }) => {
         // Fetch real blockchain data
         const [balance, txCount] = await Promise.all([
           provider.getBalance(address),
-          provider.getTransactionCount(address)
+          provider.getTransactionCount(address),
         ]);
 
         const balanceWei = balance.toString();
@@ -76,9 +88,9 @@ const WalletAnalytics: React.FC<WalletAnalyticsProps> = ({ walletAddress }) => {
         let receivedCount = 0;
         let totalSentWei = BigInt(0);
         let maxReceivedValue = BigInt(0);
-        
+
         try {
-          const rawLogs = localStorage.getItem('transaction-logs');
+          const rawLogs = localStorage.getItem("transaction-logs");
           if (rawLogs) {
             const logs = JSON.parse(rawLogs);
             for (const log of logs) {
@@ -94,7 +106,9 @@ const WalletAnalytics: React.FC<WalletAnalyticsProps> = ({ walletAddress }) => {
               }
             }
           }
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
 
         // Use on-chain txCount for total, and fill in with logs if available
         const effectiveSent = sentCount || Math.ceil(txCount * 0.6);
@@ -108,8 +122,14 @@ const WalletAnalytics: React.FC<WalletAnalyticsProps> = ({ walletAddress }) => {
           received_tx_count: effectiveReceived,
           created_contracts_count: 0,
           max_value_received: maxReceivedValue.toString() || "0",
-          avg_value_received: effectiveReceived > 0 ? (Number(balanceWei) / effectiveReceived / 2).toFixed(0) : "0",
-          avg_value_sent: totalSentWei > 0 ? (Number(totalSentWei) / effectiveSent).toFixed(0) : "0",
+          avg_value_received:
+            effectiveReceived > 0
+              ? (Number(balanceWei) / effectiveReceived / 2).toFixed(0)
+              : "0",
+          avg_value_sent:
+            totalSentWei > 0
+              ? (Number(totalSentWei) / effectiveSent).toFixed(0)
+              : "0",
           total_ether_sent: totalSentWei.toString(),
           total_ether_balance: balanceWei,
           erc20_total_ether_received: "0",
@@ -120,15 +140,18 @@ const WalletAnalytics: React.FC<WalletAnalyticsProps> = ({ walletAddress }) => {
           erc20_most_sent_token_type: "MON",
           erc20_most_rec_token_type: "MON",
           txn_frequency: txCount > 0 ? txCount / Math.max(1, txCount * 0.5) : 0,
-          avg_txn_value: txCount > 0 ? (Number(balanceWei) / txCount).toFixed(0) : "0",
+          avg_txn_value:
+            txCount > 0 ? (Number(balanceWei) / txCount).toFixed(0) : "0",
           wallet_age_days: Math.max(1, txCount),
-          risk_score: 0.1
+          risk_score: 0.1,
         };
 
         setAnalytics(realData);
       } catch (err) {
         console.error("Error fetching analytics:", err);
-        setError(err instanceof Error ? err.message : "Failed to fetch analytics data");
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch analytics data",
+        );
       } finally {
         setLoading(false);
       }
@@ -148,15 +171,39 @@ const WalletAnalytics: React.FC<WalletAnalyticsProps> = ({ walletAddress }) => {
   };
 
   const getActivityData = () => [
-    { name: 'Sent', value: analytics?.sent_tx_count || 0, fill: '#4ADE80' },
-    { name: 'Received', value: analytics?.received_tx_count || 0, fill: '#2DD4BF' },
-    { name: 'Contracts', value: analytics?.created_contracts_count || 0, fill: '#A78BFA' }
+    { name: "Sent", value: analytics?.sent_tx_count || 0, fill: "#4ADE80" },
+    {
+      name: "Received",
+      value: analytics?.received_tx_count || 0,
+      fill: "#2DD4BF",
+    },
+    {
+      name: "Contracts",
+      value: analytics?.created_contracts_count || 0,
+      fill: "#A78BFA",
+    },
   ];
 
   const getTokenData = () => [
-    { name: 'Received', value: parseFloat(formatEther(analytics?.erc20_total_ether_received || '0')), fill: '#2DD4BF' },
-    { name: 'Sent (EOAs)', value: parseFloat(formatEther(analytics?.erc20_total_ether_sent || '0')), fill: '#4ADE80' },
-    { name: 'Sent (Contracts)', value: parseFloat(formatEther(analytics?.erc20_total_ether_sent_contract || '0')), fill: '#F87171' }
+    {
+      name: "Received",
+      value: parseFloat(
+        formatEther(analytics?.erc20_total_ether_received || "0"),
+      ),
+      fill: "#2DD4BF",
+    },
+    {
+      name: "Sent (EOAs)",
+      value: parseFloat(formatEther(analytics?.erc20_total_ether_sent || "0")),
+      fill: "#4ADE80",
+    },
+    {
+      name: "Sent (Contracts)",
+      value: parseFloat(
+        formatEther(analytics?.erc20_total_ether_sent_contract || "0"),
+      ),
+      fill: "#F87171",
+    },
   ];
 
   if (loading) {
@@ -178,7 +225,9 @@ const WalletAnalytics: React.FC<WalletAnalyticsProps> = ({ walletAddress }) => {
             <AlertCircle className="w-5 h-5" />
             <span>Analytics Error</span>
           </div>
-          <p className="text-gray-400">{error || "No analytics data available"}</p>
+          <p className="text-gray-400">
+            {error || "No analytics data available"}
+          </p>
         </CardContent>
       </Card>
     );
@@ -222,19 +271,22 @@ const WalletAnalytics: React.FC<WalletAnalyticsProps> = ({ walletAddress }) => {
               <TabsTrigger value="activity">Transaction Activity</TabsTrigger>
               <TabsTrigger value="tokens">Token Distribution</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="activity">
               <div className="h-[300px] w-full bg-black/20 rounded-lg p-4">
                 <ResponsiveContainer>
-                  <BarChart data={getActivityData()} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <BarChart
+                    data={getActivityData()}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                     <XAxis dataKey="name" stroke="#888" />
                     <YAxis stroke="#888" />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#111',
-                        borderColor: '#333',
-                        color: '#fff',
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#111",
+                        borderColor: "#333",
+                        color: "#fff",
                       }}
                     />
                     <Legend />
@@ -247,7 +299,7 @@ const WalletAnalytics: React.FC<WalletAnalyticsProps> = ({ walletAddress }) => {
                 </ResponsiveContainer>
               </div>
             </TabsContent>
-            
+
             <TabsContent value="tokens">
               <div className="h-[300px] w-full bg-black/20 rounded-lg p-4">
                 <ResponsiveContainer>
@@ -260,19 +312,24 @@ const WalletAnalytics: React.FC<WalletAnalyticsProps> = ({ walletAddress }) => {
                       outerRadius={100}
                       fill="#8884d8"
                       dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, percent }) =>
+                        `${name} ${(percent * 100).toFixed(0)}%`
+                      }
                     >
                       {getTokenData().map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Pie>
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#111',
-                        borderColor: '#333',
-                        color: '#fff',
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#111",
+                        borderColor: "#333",
+                        color: "#fff",
                       }}
-                      formatter={(value: number) => [`${value.toFixed(4)} ETH`, 'Value']}
+                      formatter={(value: number) => [
+                        `${value.toFixed(4)} ETH`,
+                        "Value",
+                      ]}
                     />
                     <Legend />
                   </PieChart>
@@ -284,7 +341,9 @@ const WalletAnalytics: React.FC<WalletAnalyticsProps> = ({ walletAddress }) => {
           {/* Detailed Stats */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-black/20 rounded-lg p-4">
-              <h3 className="text-lg font-medium text-white mb-4">Transaction Stats</h3>
+              <h3 className="text-lg font-medium text-white mb-4">
+                Transaction Stats
+              </h3>
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-gray-400">Sent Transactions</span>
@@ -292,37 +351,53 @@ const WalletAnalytics: React.FC<WalletAnalyticsProps> = ({ walletAddress }) => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Received Transactions</span>
-                  <span className="text-white">{analytics.received_tx_count}</span>
+                  <span className="text-white">
+                    {analytics.received_tx_count}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Contracts Created</span>
-                  <span className="text-white">{analytics.created_contracts_count}</span>
+                  <span className="text-white">
+                    {analytics.created_contracts_count}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Transaction Frequency</span>
-                  <span className="text-white">{analytics.txn_frequency.toFixed(2)} tx/hour</span>
+                  <span className="text-white">
+                    {analytics.txn_frequency.toFixed(2)} tx/hour
+                  </span>
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-black/20 rounded-lg p-4">
-              <h3 className="text-lg font-medium text-white mb-4">Value Stats</h3>
+              <h3 className="text-lg font-medium text-white mb-4">
+                Value Stats
+              </h3>
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-gray-400">Max Received</span>
-                  <span className="text-white">{formatEther(analytics.max_value_received)} ETH</span>
+                  <span className="text-white">
+                    {formatEther(analytics.max_value_received)} ETH
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Avg Sent</span>
-                  <span className="text-white">{formatEther(analytics.avg_value_sent)} ETH</span>
+                  <span className="text-white">
+                    {formatEther(analytics.avg_value_sent)} ETH
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Total Sent</span>
-                  <span className="text-white">{formatEther(analytics.total_ether_sent)} ETH</span>
+                  <span className="text-white">
+                    {formatEther(analytics.total_ether_sent)} ETH
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Current Balance</span>
-                  <span className="text-white">{formatEther(analytics.total_ether_balance)} ETH</span>
+                  <span className="text-white">
+                    {formatEther(analytics.total_ether_balance)} ETH
+                  </span>
                 </div>
               </div>
             </div>
