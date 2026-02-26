@@ -215,14 +215,28 @@ export const getOnChainTokenURI = async (
       const id = await sbt.getTokenIdForAddress(address);
       tokenId = Number(id);
     } catch {
-      // Fallback: scan SBTMinted events for this address
+      // Fallback: scan SBTMinted events for this address (chunked for Monad's 1000-block limit)
       try {
         const filter = sbt.filters.SBTMinted(address);
-        const events = await sbt.queryFilter(filter);
-        if (events.length > 0) {
-          const event = events[events.length - 1]; // latest mint
-          const args = (event as any).args;
-          tokenId = Number(args?.tokenId ?? args?.[1]);
+        const provider = getReadProvider();
+        if (provider) {
+          const latestBlock = await provider.getBlockNumber();
+          const CHUNK = 999;
+          const startBlock = Math.max(0, latestBlock - 5000);
+          for (let from = startBlock; from <= latestBlock; from += CHUNK + 1) {
+            const to = Math.min(from + CHUNK, latestBlock);
+            try {
+              const events = await sbt.queryFilter(filter, from, to);
+              if (events.length > 0) {
+                const event = events[events.length - 1];
+                const args = (event as any).args;
+                tokenId = Number(args?.tokenId ?? args?.[1]);
+                break;
+              }
+            } catch {
+              // chunk failed, continue
+            }
+          }
         }
       } catch (evtErr) {
         console.warn("[SBT] Event log fallback failed:", evtErr);

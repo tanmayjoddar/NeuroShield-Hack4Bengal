@@ -115,6 +115,34 @@ class ContractService extends EventEmitter {
     });
   }
 
+  /**
+   * Query events with automatic block-range chunking.
+   * Monad testnet limits eth_getLogs to 1000 blocks per request.
+   * This helper paginates backwards from the latest block in 1000-block chunks.
+   */
+  private async queryFilterChunked(
+    filter: any,
+    maxBlocks = 5000,
+  ): Promise<ethers.EventLog[]> {
+    if (!this.votingContract || !walletConnector.provider) return [];
+
+    const CHUNK = 999; // stay under Monad's 1000-block limit
+    const latestBlock = await walletConnector.provider.getBlockNumber();
+    const startBlock = Math.max(0, latestBlock - maxBlocks);
+    const allEvents: ethers.EventLog[] = [];
+
+    for (let from = startBlock; from <= latestBlock; from += CHUNK + 1) {
+      const to = Math.min(from + CHUNK, latestBlock);
+      try {
+        const events = await this.votingContract.queryFilter(filter, from, to);
+        allEvents.push(...(events as ethers.EventLog[]));
+      } catch (err) {
+        console.warn(`[DAO] queryFilter chunk ${from}-${to} failed:`, err);
+      }
+    }
+    return allEvents;
+  }
+
   private async init() {
     try {
       // Try to recover wallet connection if provider/signer are missing
@@ -181,8 +209,23 @@ class ContractService extends EventEmitter {
       try {
         const owner = await this.votingContract.owner();
         console.log("Contract verified, owner:", owner);
-      } catch (error) {
-        console.warn("Could not verify contract owner (non-fatal):", error);
+      } catch (error: any) {
+        // If owner() returns 0x → contract not deployed at this address
+        if (
+          error?.code === "BAD_DATA" ||
+          error?.message?.includes("could not decode")
+        ) {
+          console.warn(
+            "Contract not deployed or ABI mismatch at",
+            contractAddress,
+            "— read-only mode. Reports/votes will fail.",
+          );
+        } else {
+          console.warn(
+            "Could not verify contract owner (non-fatal):",
+            error,
+          );
+        }
         // Don't throw — contract may still work for read/write operations
       }
 
@@ -202,8 +245,20 @@ class ContractService extends EventEmitter {
             "SHIELD token address is zero — token features disabled",
           );
         }
-      } catch (error) {
-        console.warn("Could not initialize SHIELD token (non-fatal):", error);
+      } catch (error: any) {
+        if (
+          error?.code === "BAD_DATA" ||
+          error?.message?.includes("could not decode")
+        ) {
+          console.warn(
+            "[Contract] shieldToken() returned 0x — contract not deployed. SHIELD token disabled.",
+          );
+        } else {
+          console.warn(
+            "Could not initialize SHIELD token (non-fatal):",
+            error,
+          );
+        }
       }
 
       // Set up event forwarding
@@ -530,7 +585,22 @@ class ContractService extends EventEmitter {
 
     try {
       // Use proposalCount + getProposal to fetch all proposals
-      const count = await this.votingContract?.proposalCount();
+      let count;
+      try {
+        count = await this.votingContract?.proposalCount();
+      } catch (err: any) {
+        // BAD_DATA = contract not deployed or ABI mismatch → return empty
+        if (
+          err?.code === "BAD_DATA" ||
+          err?.message?.includes("could not decode")
+        ) {
+          console.warn(
+            "[DAO] proposalCount() returned 0x — contract likely not deployed. Returning empty reports.",
+          );
+          return [];
+        }
+        throw err;
+      }
       const totalProposals = Number(count || 0);
 
       if (totalProposals === 0) return [];
@@ -565,10 +635,10 @@ class ContractService extends EventEmitter {
     } catch (error) {
       console.error("Error fetching scam reports:", error);
 
-      // Fallback: try event-based approach
+      // Fallback: try event-based approach with chunked block ranges
       try {
         const filter = this.votingContract?.filters.ProposalCreated();
-        const events = await this.votingContract?.queryFilter(filter);
+        const events = await this.queryFilterChunked(filter);
 
         return (events || []).map((event, index) => {
           const args = (event as ethers.EventLog).args;
@@ -761,7 +831,16 @@ class ContractService extends EventEmitter {
         `[DAO] eth_call isScammer(${address}) → ${result}  |  contract: ${this.votingContract?.target}`,
       );
       return result;
-    } catch (error) {
+    } catch (error: any) {
+      if (
+        error?.code === "BAD_DATA" ||
+        error?.message?.includes("could not decode")
+      ) {
+        console.warn(
+          "[DAO] isScammer() returned 0x — contract not deployed. Returning false.",
+        );
+        return false;
+      }
       console.warn("isScammer check failed (non-fatal):", error);
       return false;
     }
@@ -780,7 +859,17 @@ class ContractService extends EventEmitter {
         `[DAO] eth_call scamScore(${address}) → ${score}  |  contract: ${this.votingContract?.target}`,
       );
       return Math.min(100, score);
-    } catch (err) {
+    } catch (err: any) {
+      // BAD_DATA = contract not deployed at this address
+      if (
+        err?.code === "BAD_DATA" ||
+        err?.message?.includes("could not decode")
+      ) {
+        console.warn(
+          "[DAO] scamScore() returned 0x — contract not deployed. Returning 0.",
+        );
+        return 0;
+      }
       console.error("Error calculating scam score:", err);
       return 0;
     }
@@ -792,12 +881,11 @@ class ContractService extends EventEmitter {
     try {
       // Get all votes cast by the user
       const voteFilter = this.votingContract?.filters.VoteCast(null, address);
-      const voteEvents = await this.votingContract?.queryFilter(voteFilter);
+      const voteEvents = await this.queryFilterChunked(voteFilter);
 
       // Get all executed proposals
       const executedFilter = this.votingContract?.filters.ProposalExecuted();
-      const executedEvents =
-        await this.votingContract?.queryFilter(executedFilter);
+      const executedEvents = await this.queryFilterChunked(executedFilter);
 
       // Map proposal outcomes
       const proposalOutcomes = new Map(
