@@ -47,11 +47,23 @@ const DAOPanel = () => {
           
           setProposals(sortedReports);
           
-          // Mock data for now - in a real implementation, these would come from the contract
-          // You would need specific contract functions for these metrics
-          setUserShield(1247);
-          setVotesCast(23);
-          setAccuracyRate(89);
+          // Fetch real on-chain stats for the connected wallet
+          try {
+            const balance = await contractService.getShieldBalance(walletConnector.address!);
+            const balNum = parseFloat(balance || '0') / 1e18;
+            setUserShield(Math.round(balNum));
+          } catch {
+            setUserShield(0);
+          }
+
+          try {
+            const stats = await contractService.getUserVotingStats(walletConnector.address!);
+            setVotesCast(stats.totalVotes);
+            setAccuracyRate(stats.accuracy);
+          } catch {
+            setVotesCast(0);
+            setAccuracyRate(0);
+          }
         }
       } catch (err: any) {
         console.error("Error fetching scam reports:", err);

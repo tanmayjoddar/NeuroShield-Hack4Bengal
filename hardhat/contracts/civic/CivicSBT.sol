@@ -5,12 +5,14 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
-import "./CivicVerifier.sol";
 
 /**
  * @title CivicSBT
- * @dev Implementation of a Soulbound Token (SBT) for Civic verification status.
+ * @dev Soulbound Token (SBT) for Civic verification status and voter reputation.
  * Tokens can be minted but not transferred, following SBT principles.
+ * 
+ * Authorized updaters (CivicVerifier, QuadraticVoting) can modify metadata
+ * to reflect changes in verification level, trust score, and voting accuracy.
  */
 contract CivicSBT is ERC721URIStorage {
     using Counters for Counters.Counter;
@@ -19,35 +21,94 @@ contract CivicSBT is ERC721URIStorage {
     struct TokenMetadata {
         uint256 issuedAt;
         uint256 verificationLevel; // 1 = low, 2 = medium, 3 = high
-        uint256 trustScore;
-        uint256 votingAccuracy;
-        uint256 doiParticipation;
+        uint256 trustScore;        // 0-100
+        uint256 votingAccuracy;    // 0-100
+        uint256 doiParticipation;  // Number of DAO votes cast
     }
 
     Counters.Counter private _tokenIds;
-    CivicVerifier public civicVerifier;
+    address public admin;
+
+    // Authorized contracts that can mint SBTs and update metadata
+    mapping(address => bool) public authorizedUpdaters;
+
     mapping(address => uint256) private _addressToTokenId;
     mapping(uint256 => TokenMetadata) private _tokenMetadata;
 
     event SBTMinted(address indexed to, uint256 indexed tokenId);
     event MetadataUpdated(uint256 indexed tokenId, string newUri);
+    event AuthorizedUpdaterAdded(address indexed updater);
+    event AuthorizedUpdaterRemoved(address indexed updater);
 
-    constructor(address _civicVerifier) ERC721("CivicSBT", "CSBT") {
-        civicVerifier = CivicVerifier(_civicVerifier);
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin");
+        _;
+    }
+
+    modifier onlyAuthorized() {
+        require(authorizedUpdaters[msg.sender], "Not authorized to update SBT");
+        _;
+    }
+
+    constructor() ERC721("CivicSBT", "CSBT") {
+        admin = msg.sender;
+        // Admin is always authorized
+        authorizedUpdaters[msg.sender] = true;
+    }
+
+    // ════════════════════════════════════════════
+    // ADMIN FUNCTIONS
+    // ════════════════════════════════════════════
+
+    /**
+     * @dev Add an authorized updater (e.g., CivicVerifier or QuadraticVoting contract)
+     */
+    function addAuthorizedUpdater(address _updater) external onlyAdmin {
+        require(_updater != address(0), "Invalid address");
+        authorizedUpdaters[_updater] = true;
+        emit AuthorizedUpdaterAdded(_updater);
     }
 
     /**
-     * @dev Mint a new SBT for a verified Civic user.
-     * Can only be minted if the address is verified by Civic.
+     * @dev Remove an authorized updater
+     */
+    function removeAuthorizedUpdater(address _updater) external onlyAdmin {
+        authorizedUpdaters[_updater] = false;
+        emit AuthorizedUpdaterRemoved(_updater);
+    }
+
+    /**
+     * @dev Transfer admin role
+     */
+    function transferAdmin(address _newAdmin) external onlyAdmin {
+        require(_newAdmin != address(0), "Invalid address");
+        authorizedUpdaters[admin] = false;
+        admin = _newAdmin;
+        authorizedUpdaters[_newAdmin] = true;
+    }
+
+    // ════════════════════════════════════════════
+    // CORE FUNCTIONS
+    // ════════════════════════════════════════════
+
+    /**
+     * @dev Mint a new SBT to a specific address.
+     * Can only be called by authorized contracts (CivicVerifier).
+     * @param _to Address to receive the SBT
+     * @param verificationLevel Civic verification level (1-3)
+     * @param trustScore Initial trust score (0-100)
+     * @param votingAccuracy Initial voting accuracy (0-100)
+     * @param doiParticipation Initial participation count
      */
     function mint(
+        address _to,
         uint256 verificationLevel,
         uint256 trustScore,
         uint256 votingAccuracy,
         uint256 doiParticipation
-    ) public returns (uint256) {
-        require(!hasSBT(msg.sender), "Address already has an SBT");
-        require(civicVerifier.isVerified(msg.sender), "Address not Civic verified");
+    ) public onlyAuthorized returns (uint256) {
+        require(!hasSBT(_to), "Address already has an SBT");
+        require(_to != address(0), "Invalid address");
 
         _tokenIds.increment();
         uint256 newTokenId = _tokenIds.current();
@@ -61,19 +122,19 @@ contract CivicSBT is ERC721URIStorage {
         });
 
         _tokenMetadata[newTokenId] = metadata;
-        _addressToTokenId[msg.sender] = newTokenId;
-        _safeMint(msg.sender, newTokenId);
+        _addressToTokenId[_to] = newTokenId;
+        _safeMint(_to, newTokenId);
 
         string memory tokenURI = generateTokenURI(newTokenId);
         _setTokenURI(newTokenId, tokenURI);
 
-        emit SBTMinted(msg.sender, newTokenId);
+        emit SBTMinted(_to, newTokenId);
         return newTokenId;
     }
 
     /**
      * @dev Update an existing token's metadata.
-     * Can only be updated by the Civic verifier contract.
+     * Can be called by any authorized updater (CivicVerifier or QuadraticVoting).
      */
     function updateMetadata(
         address holder,
@@ -81,8 +142,7 @@ contract CivicSBT is ERC721URIStorage {
         uint256 trustScore,
         uint256 votingAccuracy,
         uint256 doiParticipation
-    ) public {
-        require(msg.sender == address(civicVerifier), "Only Civic verifier can update metadata");
+    ) public onlyAuthorized {
         require(hasSBT(holder), "Address has no SBT");
 
         uint256 tokenId = _addressToTokenId[holder];
@@ -98,6 +158,10 @@ contract CivicSBT is ERC721URIStorage {
 
         emit MetadataUpdated(tokenId, newUri);
     }
+
+    // ════════════════════════════════════════════
+    // VIEW FUNCTIONS
+    // ════════════════════════════════════════════
 
     /**
      * @dev Check if an address has an SBT.
@@ -115,7 +179,7 @@ contract CivicSBT is ERC721URIStorage {
     }
 
     /**
-     * @dev Generate token URI containing metadata.
+     * @dev Generate on-chain JSON token URI containing metadata.
      */
     function generateTokenURI(uint256 tokenId) internal view returns (string memory) {
         TokenMetadata memory metadata = _tokenMetadata[tokenId];
@@ -123,7 +187,7 @@ contract CivicSBT is ERC721URIStorage {
         bytes memory dataURI = abi.encodePacked(
             '{',
             '"name": "Civic Soulbound Token #', tokenId.toString(), '",',
-            '"description": "Non-transferable token representing Civic identity verification and reputation",',
+            '"description": "Non-transferable token representing Civic identity verification and DAO reputation",',
             '"image": "https://civic.me/api/sbt-image/', tokenId.toString(), '",',
             '"attributes": [',
             '{"trait_type": "Issued At", "value": "', metadata.issuedAt.toString(), '"},',
@@ -142,22 +206,26 @@ contract CivicSBT is ERC721URIStorage {
         );
     }
 
+    // ════════════════════════════════════════════
+    // SBT TRANSFER RESTRICTIONS
+    // ════════════════════════════════════════════
+
     /**
-     * @dev Override transfer functions to prevent transfers (SBT).
+     * @dev Override transfer to prevent transfers (Soulbound).
      */
-    function _transfer(address from, address to, uint256 tokenId) internal virtual override {
+    function _transfer(address, address, uint256) internal virtual override {
         revert("SBTs cannot be transferred");
     }
 
-    function transferFrom(address from, address to, uint256 tokenId) public virtual override {
+    function transferFrom(address, address, uint256) public virtual override(ERC721, IERC721) {
         revert("SBTs cannot be transferred");
     }
 
-    function safeTransferFrom(address from, address to, uint256 tokenId) public virtual override {
+    function safeTransferFrom(address, address, uint256) public virtual override(ERC721, IERC721) {
         revert("SBTs cannot be transferred");
     }
 
-    function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory data) public virtual override {
+    function safeTransferFrom(address, address, uint256, bytes memory) public virtual override(ERC721, IERC721) {
         revert("SBTs cannot be transferred");
     }
 }

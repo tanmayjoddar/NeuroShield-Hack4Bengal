@@ -22,6 +22,7 @@ func InitializeDatabase(db *gorm.DB) error {
 		&models.Report{},
 		&models.DAOProposal{},
 		&models.DAOVote{},
+		&models.ConfirmedScam{},
 		&models.Recovery{},
 		&models.TelegramMapping{},
 	)

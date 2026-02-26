@@ -6,12 +6,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
+	"time"
+
+	"gorm.io/gorm"
 )
 
 // AIService provides machine learning model access for transaction analysis
 type AIService struct {
 	modelURL         string
 	analyticsService *WalletAnalyticsService
+	db               *gorm.DB
 }
 
 // NewAIService creates a new AI service instance
@@ -23,6 +28,13 @@ func NewAIService(analyticsService *WalletAnalyticsService) *AIService {
 		modelURL:         modelURL,
 		analyticsService: analyticsService,
 	}
+}
+
+// NewAIServiceWithDB creates an AI service with direct database access for DAO queries
+func NewAIServiceWithDB(analyticsService *WalletAnalyticsService, db *gorm.DB) *AIService {
+	svc := NewAIService(analyticsService)
+	svc.db = db
+	return svc
 }
 
 // AIModelRequest represents the request structure for AI model prediction
@@ -44,17 +56,17 @@ type AIModelResponse struct {
 	Features    map[string]float64 `json:"feature_importance"`
 }
 
-// AnalyzeTransaction calls the ML model to analyze transaction risk
+// AnalyzeTransaction calls the ML model + DAO scam database to analyze transaction risk.
+// This is the backend side of the dual-layer flywheel:
+//   ML prediction + DAO community-confirmed scam data = combined risk score.
 func (s *AIService) AnalyzeTransaction(tx models.Transaction) (float64, error) {
 	// Create a fixed array of 18 features as required by external ML API
 	features := make([]float64, 18)
 
-	// Set transaction value in the features array (position 13 based on test script)
-	features[13] = tx.Value
-
-	// Set gas price in the features array (position 14 based on test script)
-	gasPrice := 20.0 // Default gas price
-	features[14] = gasPrice
+	// Populate known features
+	features[13] = tx.Value  // Transaction value
+	gasPrice := 20.0
+	features[14] = gasPrice  // Gas price
 
 	// Determine if this is a contract interaction
 	isContract := false
@@ -75,18 +87,18 @@ func (s *AIService) AnalyzeTransaction(tx models.Transaction) (float64, error) {
 		return 0, fmt.Errorf("error marshaling request: %w", err)
 	}
 
-	// Make HTTP request to ML model
-	resp, err := http.Post(s.modelURL, "application/json", bytes.NewBuffer(jsonData))
+	// Make HTTP request to ML model with timeout
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Post(s.modelURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return 0, fmt.Errorf("error calling ML model: %w", err)
 	}
 	defer resp.Body.Close()
 
-	// Check if response is successful
 	if resp.StatusCode != http.StatusOK {
 		return 0, fmt.Errorf("ML model returned non-OK status: %d", resp.StatusCode)
 	}
-	// Parse response
+
 	var externalResponse struct {
 		Prediction string `json:"prediction"`
 		Type       string `json:"Type"`
@@ -96,17 +108,58 @@ func (s *AIService) AnalyzeTransaction(tx models.Transaction) (float64, error) {
 		return 0, fmt.Errorf("error decoding model response: %w", err)
 	}
 
-	// Convert external API response to our risk score format
-	var riskScore float64
-	if externalResponse.Prediction == "Fraud" {
-		riskScore = 0.85 // High risk
-	} else if externalResponse.Prediction == "Suspicious" {
-		riskScore = 0.5 // Medium risk
-	} else {
-		riskScore = 0.1 // Low risk
+	// Convert ML prediction to risk score
+	var mlRisk float64
+	switch externalResponse.Prediction {
+	case "Fraud":
+		mlRisk = 0.85
+	case "Suspicious":
+		mlRisk = 0.50
+	default:
+		mlRisk = 0.10
 	}
 
-	return riskScore, nil
+	// ══════════════════════════════════════════════════
+	// FLYWHEEL: Boost risk with DAO-confirmed scam data
+	// ══════════════════════════════════════════════════
+	daoBoost := s.getDAOScamBoost(tx.ToAddress)
+
+	// Combine: ML risk + DAO boost (capped at 1.0)
+	combinedRisk := mlRisk + daoBoost
+	if combinedRisk > 1.0 {
+		combinedRisk = 1.0
+	}
+
+	return combinedRisk, nil
+}
+
+// getDAOScamBoost queries the DAO confirmed scam database and returns a risk boost.
+// This is the core of the self-improving flywheel: community-curated data improves ML scoring.
+func (s *AIService) getDAOScamBoost(address string) float64 {
+	if s.db == nil {
+		return 0
+	}
+
+	normAddr := strings.ToLower(address)
+
+	// Check if address is a DAO-confirmed scam
+	var confirmed models.ConfirmedScam
+	if err := s.db.Where("address = ?", normAddr).First(&confirmed).Error; err == nil {
+		// Confirmed scam: boost proportional to community confidence
+		return float64(confirmed.ScamScore) / 100.0 * 0.5 // max +0.5 boost
+	}
+
+	// Check if address has active proposals (under review)
+	var activeCount int64
+	s.db.Model(&models.DAOProposal{}).
+		Where("suspicious_address = ? AND status = ?", normAddr, "active").
+		Count(&activeCount)
+
+	if activeCount > 0 {
+		return 0.15 // Under review gets a moderate boost
+	}
+
+	return 0
 }
 
 // AnalyzeTransactionEnhanced performs enhanced analysis for high-value transactions
@@ -155,14 +208,33 @@ func (s *AIService) GetRiskExplanation(risk float64, tx models.Transaction) stri
 	return "Low risk transaction: No significant risk factors detected."
 }
 
-// IsAddressBlacklisted checks if an address is in the known scammer list
+// IsAddressBlacklisted checks if an address is in the DAO-confirmed scam database.
+// Replaces the old hardcoded list with real community-curated data.
 func (s *AIService) IsAddressBlacklisted(address string) (bool, error) {
-	// TODO: Implement blacklist checking against a database or external API
-	// For now, we'll just return a hardcoded value for demonstration
-	knownScamAddresses := map[string]bool{
-		"0x1234567890abcdef1234567890abcdef12345678": true,
-		"0x0987654321fedcba0987654321fedcba09876543": true,
+	if s.db == nil {
+		return false, nil
 	}
 
-	return knownScamAddresses[address], nil
+	normAddr := strings.ToLower(address)
+
+	// Check DAO confirmed scams table
+	var count int64
+	err := s.db.Model(&models.ConfirmedScam{}).
+		Where("address = ?", normAddr).
+		Count(&count).Error
+	if err != nil {
+		return false, fmt.Errorf("failed to query scam database: %w", err)
+	}
+
+	if count > 0 {
+		return true, nil
+	}
+
+	// Also check confirmed reports from the reporting system
+	var reportCount int64
+	s.db.Model(&models.Report{}).
+		Where("scammer_address = ? AND status = ?", normAddr, "confirmed").
+		Count(&reportCount)
+
+	return reportCount > 0, nil
 }

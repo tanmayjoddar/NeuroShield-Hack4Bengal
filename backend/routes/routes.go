@@ -54,7 +54,7 @@ func SetupMainRouter(db *gorm.DB, telegramService *services.TelegramService) *gi
 		analyticsService, _ = services.NewWalletAnalyticsService(db, "")
 	}
 
-	aiService := services.NewAIService(analyticsService)
+	aiService := services.NewAIServiceWithDB(analyticsService, db)
 
 	// Initialize Civic Auth service
 	civicConfig := &services.CivicConfig{
@@ -63,7 +63,7 @@ func SetupMainRouter(db *gorm.DB, telegramService *services.TelegramService) *gi
 		ApiKey:           os.Getenv("CIVIC_API_KEY"),
 		Stage:            os.Getenv("CIVIC_STAGE"), // "prod" or "preprod"
 	}
-	
+
 	civicService := services.NewCivicAuthService(db, civicConfig)
 	civicHandler := handlers.NewCivicAuthHandler(civicService)
 
@@ -95,6 +95,8 @@ func SetupMainRouter(db *gorm.DB, telegramService *services.TelegramService) *gi
 
 		// Public DAO endpoints
 		api.GET("/dao/proposals", daoHandler.GetProposals)
+		api.GET("/dao/scamscore/:address", daoHandler.GetScamScore)
+		api.GET("/dao/address/:address", daoHandler.GetAddressStatus)
 
 		// Wallet analytics endpoints
 		api.GET("/analytics/wallet/:address", analyticsHandler.GetWalletAnalytics)

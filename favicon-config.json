@@ -1,5 +1,0 @@
-{
-  "scripts": {
-    "generate-favicon": "svg2ico public/favicon.svg public/favicon.ico -w 16 32 48"
-  }
-}

@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.20;
 
 import "./CivicVerifier.sol";
 
 /**
  * @title CivicGatedWallet
- * @dev Implements a wallet contract with Civic Pass verification for high-value transactions
+ * @dev Wallet contract with Civic Pass verification for high-value transactions.
+ * Transactions above the threshold require the sender to be Civic verified.
  */
-contract CivicGatedWallet is CivicVerifier {
+contract CivicGatedWallet {
+    CivicVerifier public civicVerifier;
     uint256 public verificationThreshold;
     address public owner;
     
@@ -15,13 +17,13 @@ contract CivicGatedWallet is CivicVerifier {
     event ThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);
     
     /**
-     * @dev Initializes the contract with Civic Pass and a threshold amount
-     * @param _civicPassAddress The Civic Pass contract address
+     * @dev Initializes the contract with CivicVerifier address and a threshold amount
+     * @param _civicVerifierAddress The deployed CivicVerifier contract address
      * @param _threshold Threshold amount above which Civic verification is required
      */
-    constructor(address _civicPassAddress, uint256 _threshold) 
-        CivicVerifier(_civicPassAddress) 
-    {
+    constructor(address _civicVerifierAddress, uint256 _threshold) {
+        require(_civicVerifierAddress != address(0), "Invalid CivicVerifier address");
+        civicVerifier = CivicVerifier(_civicVerifierAddress);
         verificationThreshold = _threshold;
         owner = msg.sender;
     }
@@ -45,18 +47,23 @@ contract CivicGatedWallet is CivicVerifier {
     }
     
     /**
-     * @dev Executes a transaction, requiring Civic verification for amounts above threshold
+     * @dev Executes a transaction, requiring Civic verification for amounts above threshold.
+     * Only the owner can execute transactions from this wallet.
      * @param _to Recipient address
      * @param _value Transaction amount
      * @return success Whether the transaction was successful
      */
-    function executeTransaction(address payable _to, uint256 _value) external returns (bool success) {
+    function executeTransaction(address payable _to, uint256 _value) external onlyOwner returns (bool success) {
         require(_to != address(0), "CivicGatedWallet: Invalid recipient");
+        require(address(this).balance >= _value, "CivicGatedWallet: Insufficient balance");
         
         bool requiresVerification = _value >= verificationThreshold;
         
         if (requiresVerification) {
-            require(civicPass.isValid(msg.sender), "CivicGatedWallet: Civic verification required for high-value transaction");
+            require(
+                civicVerifier.isVerified(msg.sender),
+                "CivicGatedWallet: Civic verification required for high-value transaction"
+            );
         }
         
         (success, ) = _to.call{value: _value}("");

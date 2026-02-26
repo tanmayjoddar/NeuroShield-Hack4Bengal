@@ -3,7 +3,12 @@ pragma solidity ^0.8.20;
 
 /**
  * @title CivicVerifier
- * @dev Contract module for verifying Civic Pass ownership, managing SBTs, and restricting access to functions
+ * @dev Manages Civic Pass verification and bridges identity to SBT minting.
+ * 
+ * Access control:
+ *   - Admin can update contract addresses
+ *   - Anyone can trigger verification for their own address (if Civic Pass valid)
+ *   - SBT minting is delegated to CivicSBT (this contract is authorized updater)
  */
 
 interface ICivicPass {
@@ -12,6 +17,7 @@ interface ICivicPass {
 
 interface ICivicSBT {
     function mint(
+        address _to,
         uint256 verificationLevel,
         uint256 trustScore,
         uint256 votingAccuracy,
@@ -32,10 +38,12 @@ interface ICivicSBT {
 contract CivicVerifier {
     ICivicPass public civicPass;
     ICivicSBT public sbtContract;
+    address public admin;
 
     event CivicPassUpdated(address indexed oldPass, address indexed newPass);
     event SBTContractUpdated(address indexed oldSBT, address indexed newSBT);
     event UserVerified(address indexed user, uint256 verificationLevel);
+    event AdminTransferred(address indexed oldAdmin, address indexed newAdmin);
 
     struct UserVerification {
         bool isVerified;
@@ -48,6 +56,11 @@ contract CivicVerifier {
 
     mapping(address => UserVerification) private userVerifications;
 
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "CivicVerifier: Only admin");
+        _;
+    }
+
     /**
      * @dev Initializes the contract with Civic Pass and SBT contract addresses
      */
@@ -56,12 +69,13 @@ contract CivicVerifier {
         require(_sbtAddress != address(0), "Invalid SBT address");
         civicPass = ICivicPass(_civicPassAddress);
         sbtContract = ICivicSBT(_sbtAddress);
+        admin = msg.sender;
     }
 
     /**
-     * @dev Updates the Civic Pass contract address
+     * @dev Updates the Civic Pass contract address (admin only)
      */
-    function updateCivicPass(address _newCivicPass) external {
+    function updateCivicPass(address _newCivicPass) external onlyAdmin {
         require(_newCivicPass != address(0), "Invalid CivicPass address");
         address oldPass = address(civicPass);
         civicPass = ICivicPass(_newCivicPass);
@@ -69,13 +83,23 @@ contract CivicVerifier {
     }
 
     /**
-     * @dev Updates the SBT contract address
+     * @dev Updates the SBT contract address (admin only)
      */
-    function updateSBTContract(address _newSBT) external {
+    function updateSBTContract(address _newSBT) external onlyAdmin {
         require(_newSBT != address(0), "Invalid SBT address");
         address oldSBT = address(sbtContract);
         sbtContract = ICivicSBT(_newSBT);
         emit SBTContractUpdated(oldSBT, _newSBT);
+    }
+
+    /**
+     * @dev Transfer admin role
+     */
+    function transferAdmin(address _newAdmin) external onlyAdmin {
+        require(_newAdmin != address(0), "Invalid admin address");
+        address oldAdmin = admin;
+        admin = _newAdmin;
+        emit AdminTransferred(oldAdmin, _newAdmin);
     }
 
     /**
@@ -109,7 +133,8 @@ contract CivicVerifier {
     }
 
     /**
-     * @dev Registers or updates a user's verification and manages SBT accordingly
+     * @dev Registers or updates a user's verification and manages SBT accordingly.
+     * Mints SBT to the USER address (not msg.sender/this contract).
      */
     function registerVerification(
         address _userAddress,
@@ -130,10 +155,23 @@ contract CivicVerifier {
             doiParticipation: _doiParticipation
         });
 
+        // Mint SBT to the USER (not to this contract)
         if (!sbtContract.hasSBT(_userAddress)) {
-            sbtContract.mint(_verificationLevel, _trustScore, _votingAccuracy, _doiParticipation);
+            sbtContract.mint(
+                _userAddress,
+                _verificationLevel,
+                _trustScore,
+                _votingAccuracy,
+                _doiParticipation
+            );
         } else {
-            sbtContract.updateMetadata(_userAddress, _verificationLevel, _trustScore, _votingAccuracy, _doiParticipation);
+            sbtContract.updateMetadata(
+                _userAddress,
+                _verificationLevel,
+                _trustScore,
+                _votingAccuracy,
+                _doiParticipation
+            );
         }
 
         emit UserVerified(_userAddress, _verificationLevel);

@@ -5,277 +5,389 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "./civic/CivicVerifier.sol";
-import "./civic/CivicSBT.sol";
 
 /**
  * @title QuadraticVoting
- * @dev Implementation of quadratic voting mechanism for DAO proposals with SBT integration
+ * @dev DAO governance with quadratic voting for community-driven scam detection.
+ * 
+ * Part of NeuroShield's Dual-Layer Defense system:
+ *   Layer 1 (Instant): ML model flags suspicious transactions in real-time
+ *   Layer 2 (Long-term): Community curates scam database via quadratic voting
+ *   Flywheel: DAO-confirmed scams feed back into ML training data
+ *
+ * Quadratic voting ensures fairness:
+ *   - 1 token   = 1 vote power
+ *   - 100 tokens = 10 vote power  
+ *   - 10000 tokens = 100 vote power
+ *   This prevents whales from dominating governance.
+ *
+ * Voter reputation tracking:
+ *   - Accuracy score tracks how often you vote with the majority
+ *   - Participation count rewards active community members
+ *   - Both feed into future voting weight calculations
  */
 contract QuadraticVoting is Ownable, ReentrancyGuard {
-    IERC20 public shieldToken;                 // The governance token (SHIELD)
-    CivicVerifier public civicVerifier;        // Civic verification contract
-    CivicSBT public civicSBT;                  // Civic Soulbound Token contract
-    uint256 public constant SCALE = 1e18;      // Scaling factor for square root calculations
-    uint256 public proposalCount;              // Total number of proposals created
-    uint256 public votingPeriod = 7 days;     // Default voting period duration
-    uint256 public minVerificationLevel = 2;   // Minimum Civic verification level required to vote
-    
+    // ════════════════════════════════════════════
+    // STATE VARIABLES
+    // ════════════════════════════════════════════
+
+    IERC20 public shieldToken;
+    uint256 public proposalCount;
+    uint256 public votingPeriod = 3 days;
+    uint256 public constant SCAM_THRESHOLD = 60; // 60% of vote power must agree
+
+    // ════════════════════════════════════════════
+    // DATA STRUCTURES
+    // ════════════════════════════════════════════
+
     struct Proposal {
-        address reporter;           // Address that reported the potential scam
-        address target;            // Address being reported
-        string evidence;           // IPFS hash of evidence
-        uint256 startTime;        // Start time of voting period
-        uint256 endTime;          // End time of voting period
-        uint256 forVotes;         // Accumulated square root of YES votes
-        uint256 againstVotes;     // Accumulated square root of NO votes
-        bool executed;            // Whether the proposal has been executed
-        bool passed;              // Whether the proposal passed
-        mapping(address => Vote) votes; // Votes cast by address
+        address reporter;
+        address suspiciousAddress;
+        string description;
+        string evidence;
+        uint256 votesFor;       // Accumulated quadratic vote power FOR (confirms scam)
+        uint256 votesAgainst;   // Accumulated quadratic vote power AGAINST
+        uint256 startTime;
+        uint256 endTime;
+        bool isActive;
+        bool executed;
     }
 
-    struct Vote {
-        bool voted;       // Whether the vote has been cast
-        bool support;     // Whether the vote is in support
-        uint256 weight;   // Weight of the vote (based on tokens and reputation)
-        uint256 time;     // When the vote was cast
+    struct VoteInfo {
+        bool hasVoted;
+        bool support;       // true = confirms scam, false = not a scam
+        uint256 tokens;     // Raw tokens staked
+        uint256 power;      // Quadratic vote power (sqrt of tokens)
     }
 
-    struct VotingPower {
-        uint256 base;     // Base voting power from SHIELD tokens
-        uint256 bonus;    // Bonus voting power from SBT reputation
-    }
+    // ════════════════════════════════════════════
+    // STORAGE MAPPINGS
+    // ════════════════════════════════════════════
 
-    event ProposalCreated(uint256 indexed proposalId, address indexed reporter, address indexed target);
-    event VoteCast(uint256 indexed proposalId, address indexed voter, bool support, uint256 weight);
+    mapping(uint256 => Proposal) public proposals;
+    mapping(uint256 => mapping(address => VoteInfo)) public votes;
+    mapping(uint256 => address[]) private proposalVoters;
+
+    // Scam tracking: fed back to ML layer for dual-layer defense
+    mapping(address => bool) public isScammer;
+    mapping(address => uint256) public scamScore;           // 0-100
+
+    // Voter reputation: used for weighted voting in future proposals
+    mapping(address => uint256) public voterAccuracy;       // 0-100
+    mapping(address => uint256) public voterParticipation;  // Total proposals voted on
+
+    // ════════════════════════════════════════════
+    // EVENTS (must match frontend ABI exactly)
+    // ════════════════════════════════════════════
+
+    event ProposalCreated(
+        uint256 indexed proposalId,
+        address indexed reporter,
+        address indexed suspiciousAddress,
+        string description,
+        string evidence
+    );
+
+    event VoteCast(
+        uint256 indexed proposalId,
+        address indexed voter,
+        bool support,
+        uint256 tokens,
+        uint256 power
+    );
+
     event ProposalExecuted(uint256 indexed proposalId, bool passed);
-    event MinVerificationLevelUpdated(uint256 newLevel);
-    event CivicVerifierUpdated(address newVerifier);
-    event CivicSBTUpdated(address newSBT);
+    event ScamAddressConfirmed(address indexed scamAddress, uint256 score);
 
-    constructor(
-        address _shieldToken,
-        address _civicVerifier,
-        address _civicSBT
-    ) {
+    // ════════════════════════════════════════════
+    // CONSTRUCTOR
+    // ════════════════════════════════════════════
+
+    constructor(address _shieldToken) {
+        require(_shieldToken != address(0), "Invalid token address");
         shieldToken = IERC20(_shieldToken);
-        civicVerifier = CivicVerifier(_civicVerifier);
-        civicSBT = CivicSBT(_civicSBT);
     }
 
+    // ════════════════════════════════════════════
+    // CORE FUNCTIONS
+    // ════════════════════════════════════════════
+
     /**
-     * @dev Create a new proposal
-     * @param target The address being reported
-     * @param evidence IPFS hash of evidence
+     * @dev Submit a new scam report proposal.
+     * Anyone can submit a report; the community votes on its validity.
+     * @param _suspiciousAddress Address being reported as scam
+     * @param _description Description of suspicious activity
+     * @param _evidence IPFS hash or URL to evidence
+     * @return proposalId The ID of the created proposal
      */
-    function createProposal(
-        address target,
-        string memory evidence
-    ) external {
-        require(civicVerifier.isVerified(msg.sender), "Must be Civic verified to create proposal");
-        require(civicSBT.hasSBT(msg.sender), "Must have SBT to create proposal");
-        
+    function submitProposal(
+        address _suspiciousAddress,
+        string memory _description,
+        string memory _evidence
+    ) external returns (uint256) {
+        require(_suspiciousAddress != address(0), "Invalid address");
+        require(bytes(_description).length > 0, "Description required");
+
         proposalCount++;
-        Proposal storage proposal = proposals[proposalCount];
-        proposal.reporter = msg.sender;
-        proposal.target = target;
-        proposal.evidence = evidence;
-        proposal.startTime = block.timestamp;
-        proposal.endTime = block.timestamp + votingPeriod;
-        
-        emit ProposalCreated(proposalCount, msg.sender, target);
+
+        proposals[proposalCount] = Proposal({
+            reporter: msg.sender,
+            suspiciousAddress: _suspiciousAddress,
+            description: _description,
+            evidence: _evidence,
+            votesFor: 0,
+            votesAgainst: 0,
+            startTime: block.timestamp,
+            endTime: block.timestamp + votingPeriod,
+            isActive: true,
+            executed: false
+        });
+
+        emit ProposalCreated(
+            proposalCount,
+            msg.sender,
+            _suspiciousAddress,
+            _description,
+            _evidence
+        );
+
+        return proposalCount;
     }
 
     /**
-     * @dev Cast a vote on a proposal
-     * @param proposalId ID of the proposal
-     * @param support Whether to vote for or against
+     * @dev Cast a quadratic vote on a proposal.
+     * Vote power = sqrt(tokens staked), preventing plutocratic control.
+     * Reputation bonus: voters with >80% accuracy and 5+ votes get 20% boost.
+     *
+     * @param _proposalId ID of the proposal
+     * @param _support true = confirm scam, false = not a scam
+     * @param _tokens Number of SHIELD tokens to stake for this vote
+     * @return votePower The quadratic vote power applied
      */
     function castVote(
-        uint256 proposalId,
-        bool support
-    ) external nonReentrant {
-        require(civicVerifier.isVerified(msg.sender), "Must be Civic verified to vote");
-        require(civicSBT.hasSBT(msg.sender), "Must have SBT to vote");
-        require(civicVerifier.getVerificationLevel(msg.sender) >= minVerificationLevel, "Insufficient verification level");
-
-        Proposal storage proposal = proposals[proposalId];
+        uint256 _proposalId,
+        bool _support,
+        uint256 _tokens
+    ) external nonReentrant returns (uint256) {
+        Proposal storage proposal = proposals[_proposalId];
+        require(proposal.isActive, "Proposal not active");
+        require(block.timestamp >= proposal.startTime, "Voting not started");
         require(block.timestamp <= proposal.endTime, "Voting period ended");
-        require(!proposal.votes[msg.sender].voted, "Already voted");
+        require(!votes[_proposalId][msg.sender].hasVoted, "Already voted");
+        require(_tokens > 0, "Must stake tokens");
 
-        VotingPower memory power = calculateVotingPower(msg.sender);
-        uint256 weight = power.base + power.bonus;
-        require(weight > 0, "No voting power");
+        // Transfer tokens from voter to contract (staking for vote)
+        require(
+            shieldToken.transferFrom(msg.sender, address(this), _tokens),
+            "Token transfer failed"
+        );
 
-        proposal.votes[msg.sender] = Vote({
-            voted: true,
-            support: support,
-            weight: weight,
-            time: block.timestamp
-        });
+        // Quadratic vote power: sqrt(tokens)
+        uint256 votePower = Math.sqrt(_tokens);
+        require(votePower > 0, "Vote power too low");
 
-        // Add the square root of voting power to appropriate counter
-        uint256 voteWeight = Math.sqrt(weight * SCALE);
-        if (support) {
-            proposal.forVotes += voteWeight;
-        } else {
-            proposal.againstVotes += voteWeight;
+        // Reputation bonus: accurate + active voters get 20% boost
+        if (voterAccuracy[msg.sender] > 80 && voterParticipation[msg.sender] >= 5) {
+            votePower = votePower + (votePower * 20) / 100;
         }
 
-        // Update voter's metrics in their SBT
-        updateVoterMetrics(msg.sender);
-
-        emit VoteCast(proposalId, msg.sender, support, weight);
-    }
-
-    /**
-     * @dev Calculate a user's voting power based on SHIELD tokens and SBT reputation
-     */
-    function calculateVotingPower(address voter) public view returns (VotingPower memory) {
-        uint256 baseVotingPower = shieldToken.balanceOf(voter);
-        
-        // Get SBT reputation metrics
-        CivicSBT.TokenMetadata memory metadata = civicSBT.getTokenMetadata(voter);
-        
-        // Calculate bonus based on verification level and metrics
-        uint256 levelMultiplier = metadata.verificationLevel * 10; // 10% per level
-        uint256 accuracyBonus = (metadata.votingAccuracy * baseVotingPower) / 100;
-        uint256 participationBonus = (metadata.doiParticipation * baseVotingPower) / 1000;
-        uint256 trustBonus = (metadata.trustScore * baseVotingPower) / 100;
-        
-        uint256 totalBonus = (baseVotingPower * levelMultiplier / 100) + accuracyBonus + participationBonus + trustBonus;
-
-        return VotingPower({
-            base: baseVotingPower,
-            bonus: totalBonus
+        // Record the vote
+        votes[_proposalId][msg.sender] = VoteInfo({
+            hasVoted: true,
+            support: _support,
+            tokens: _tokens,
+            power: votePower
         });
+
+        // Track voter for this proposal (needed for reputation + token return)
+        proposalVoters[_proposalId].push(msg.sender);
+
+        // Update vote counts
+        if (_support) {
+            proposal.votesFor += votePower;
+        } else {
+            proposal.votesAgainst += votePower;
+        }
+
+        // Update voter participation count
+        voterParticipation[msg.sender]++;
+
+        emit VoteCast(_proposalId, msg.sender, _support, _tokens, votePower);
+        return votePower;
     }
 
     /**
-     * @dev Execute a proposal after its voting period
+     * @dev Execute a proposal after voting period ends.
+     * If passed: marks address as scammer, updates scam score.
+     * Updates voter accuracy for ALL voters on this proposal.
+     * Returns staked tokens to all voters.
+     *
+     * This is the critical junction of the dual-layer defense:
+     * DAO-confirmed scams are added to the on-chain scam database
+     * which the ML model queries for enhanced detection.
+     *
+     * @param _proposalId ID of the proposal
+     * @return passed Whether the scam report was confirmed
      */
-    function executeProposal(uint256 proposalId) external {
-        Proposal storage proposal = proposals[proposalId];
+    function executeProposal(uint256 _proposalId) external returns (bool) {
+        Proposal storage proposal = proposals[_proposalId];
+        require(proposal.isActive, "Proposal not active");
         require(block.timestamp > proposal.endTime, "Voting period not ended");
         require(!proposal.executed, "Already executed");
 
         proposal.executed = true;
-        proposal.passed = proposal.forVotes > proposal.againstVotes;
+        proposal.isActive = false;
 
-        // If proposal passed, update reputation for correct voters
-        if (proposal.passed) {
-            updateReputationForVoters(proposalId, true);  // true voters
-        } else {
-            updateReputationForVoters(proposalId, false); // false voters
+        uint256 totalVotes = proposal.votesFor + proposal.votesAgainst;
+        bool passed = false;
+
+        if (totalVotes > 0) {
+            // Passed if forVotes exceed threshold percentage
+            passed = (proposal.votesFor * 100) / totalVotes >= SCAM_THRESHOLD;
         }
 
-        emit ProposalExecuted(proposalId, proposal.passed);
+        if (passed) {
+            // Mark address as confirmed scammer
+            isScammer[proposal.suspiciousAddress] = true;
+
+            // Update scam score (increases with each confirmed report, caps at 100)
+            uint256 newScore = scamScore[proposal.suspiciousAddress] + 25;
+            if (newScore > 100) newScore = 100;
+            scamScore[proposal.suspiciousAddress] = newScore;
+
+            emit ScamAddressConfirmed(proposal.suspiciousAddress, newScore);
+        }
+
+        // Update voter accuracy for ALL voters on this specific proposal
+        _updateVoterAccuracy(_proposalId, passed);
+
+        // Return staked tokens to all voters
+        _returnStakedTokens(_proposalId);
+
+        emit ProposalExecuted(_proposalId, passed);
+        return passed;
     }
 
-    /**
-     * @dev Update voter metrics in their SBT
-     */
-    function updateVoterMetrics(address voter) internal {
-        // Get current metrics
-        CivicSBT.TokenMetadata memory metadata = civicSBT.getTokenMetadata(voter);
-        
-        // Calculate new participation metric
-        uint256 newParticipation = metadata.doiParticipation + 1;
-        
-        // Update SBT metadata
-        civicSBT.updateMetadata(
-            voter,
-            metadata.verificationLevel,
-            metadata.trustScore,
-            metadata.votingAccuracy,
-            newParticipation
-        );
-    }
+    // ════════════════════════════════════════════
+    // INTERNAL FUNCTIONS
+    // ════════════════════════════════════════════
 
     /**
-     * @dev Update reputation for voters after proposal execution
+     * @dev Update accuracy score for all voters on a proposal.
+     * Voters who voted with the majority get accuracy boost.
+     * This creates the self-improving flywheel:
+     *   accurate voters -> more vote weight -> better curation -> better ML data
      */
-    function updateReputationForVoters(uint256 proposalId, bool votedCorrectly) internal {
-        Proposal storage proposal = proposals[proposalId];
-        
-        // For each voter in this proposal
-        // Note: In production, you'd want to handle this more efficiently
-        // through a separate batch update mechanism
-        for (uint256 i = 1; i <= proposalCount; i++) {
-            address voter = proposals[i].reporter; // Example: loop through voters
-            if (proposal.votes[voter].voted) {
-                if (proposal.votes[voter].support == votedCorrectly) {
-                    // Voter was correct, increase their accuracy
-                    CivicSBT.TokenMetadata memory metadata = civicSBT.getTokenMetadata(voter);
-                    uint256 newAccuracy = Math.min(100, metadata.votingAccuracy + 5);
-                    civicSBT.updateMetadata(
-                        voter,
-                        metadata.verificationLevel,
-                        metadata.trustScore,
-                        newAccuracy,
-                        metadata.doiParticipation
-                    );
+    function _updateVoterAccuracy(uint256 _proposalId, bool proposalPassed) internal {
+        address[] storage voters = proposalVoters[_proposalId];
+
+        for (uint256 i = 0; i < voters.length; i++) {
+            address voter = voters[i];
+            VoteInfo storage voteInfo = votes[_proposalId][voter];
+
+            bool votedCorrectly = (voteInfo.support == proposalPassed);
+
+            if (votedCorrectly) {
+                uint256 current = voterAccuracy[voter];
+                if (current == 0) {
+                    voterAccuracy[voter] = 75; // First correct vote starts at 75
+                } else {
+                    uint256 newAcc = current + 5;
+                    voterAccuracy[voter] = newAcc > 100 ? 100 : newAcc;
                 }
+            } else {
+                uint256 current = voterAccuracy[voter];
+                voterAccuracy[voter] = current >= 10 ? current - 10 : 0;
             }
         }
     }
 
-    // Admin functions
+    /**
+     * @dev Return staked tokens to all voters after proposal execution.
+     * All voters get their tokens back regardless of outcome.
+     */
+    function _returnStakedTokens(uint256 _proposalId) internal {
+        address[] storage voters = proposalVoters[_proposalId];
 
-    function setMinVerificationLevel(uint256 _newLevel) external onlyOwner {
-        require(_newLevel > 0 && _newLevel <= 3, "Invalid level");
-        minVerificationLevel = _newLevel;
-        emit MinVerificationLevelUpdated(_newLevel);
+        for (uint256 i = 0; i < voters.length; i++) {
+            address voter = voters[i];
+            uint256 stakedTokens = votes[_proposalId][voter].tokens;
+
+            if (stakedTokens > 0) {
+                shieldToken.transfer(voter, stakedTokens);
+            }
+        }
     }
 
-    function setCivicVerifier(address _newVerifier) external onlyOwner {
-        require(_newVerifier != address(0), "Invalid address");
-        civicVerifier = CivicVerifier(_newVerifier);
-        emit CivicVerifierUpdated(_newVerifier);
-    }
+    // ════════════════════════════════════════════
+    // VIEW FUNCTIONS (matching frontend ABI)
+    // ════════════════════════════════════════════
 
-    function setCivicSBT(address _newSBT) external onlyOwner {
-        require(_newSBT != address(0), "Invalid address");
-        civicSBT = CivicSBT(_newSBT);
-        emit CivicSBTUpdated(_newSBT);
-    }
-
-    // View functions
-
+    /**
+     * @dev Get proposal details (matches frontend tuple shape exactly)
+     */
     function getProposal(uint256 proposalId) external view returns (
         address reporter,
-        address target,
+        address suspiciousAddress,
+        string memory description,
         string memory evidence,
-        uint256 startTime,
-        uint256 endTime,
-        uint256 forVotes,
-        uint256 againstVotes,
-        bool executed,
-        bool passed
+        uint256 votesFor,
+        uint256 votesAgainst,
+        bool _isActive
     ) {
-        Proposal storage proposal = proposals[proposalId];
+        Proposal storage p = proposals[proposalId];
         return (
-            proposal.reporter,
-            proposal.target,
-            proposal.evidence,
-            proposal.startTime,
-            proposal.endTime,
-            proposal.forVotes,
-            proposal.againstVotes,
-            proposal.executed,
-            proposal.passed
+            p.reporter,
+            p.suspiciousAddress,
+            p.description,
+            p.evidence,
+            p.votesFor,
+            p.votesAgainst,
+            p.isActive
         );
     }
 
+    /**
+     * @dev Get vote details for a specific voter on a proposal
+     */
     function getVote(uint256 proposalId, address voter) external view returns (
-        bool voted,
+        bool hasVoted,
         bool support,
-        uint256 weight,
-        uint256 time
+        uint256 tokens,
+        uint256 power
     ) {
-        Vote storage vote = proposals[proposalId].votes[voter];
-        return (vote.voted, vote.support, vote.weight, vote.time);
+        VoteInfo storage v = votes[proposalId][voter];
+        return (v.hasVoted, v.support, v.tokens, v.power);
     }
 
-    mapping(uint256 => Proposal) public proposals;
+    /**
+     * @dev Get voter reputation stats (accuracy + participation)
+     */
+    function getVoterStats(address voter) external view returns (
+        uint256 accuracy,
+        uint256 participation
+    ) {
+        return (voterAccuracy[voter], voterParticipation[voter]);
+    }
+
+    /**
+     * @dev Get number of voters on a proposal
+     */
+    function getProposalVoterCount(uint256 proposalId) external view returns (uint256) {
+        return proposalVoters[proposalId].length;
+    }
+
+    // ════════════════════════════════════════════
+    // ADMIN FUNCTIONS
+    // ════════════════════════════════════════════
+
+    function setVotingPeriod(uint256 _newPeriod) external onlyOwner {
+        require(_newPeriod >= 1 hours && _newPeriod <= 30 days, "Invalid period");
+        votingPeriod = _newPeriod;
+    }
+
+    function setShieldToken(address _newToken) external onlyOwner {
+        require(_newToken != address(0), "Invalid address");
+        shieldToken = IERC20(_newToken);
+    }
 }

@@ -1,18 +1,18 @@
-// Civic Auth Integration for UnhackableWallet
-// Handles Civic verification and identity services
+// Civic Auth Integration for NeuroShield
+// Connects to on-chain CivicVerifier + QuadraticVoting contracts for real verification
+// Falls back to local heuristics when contracts unavailable
 
 import { ethers } from 'ethers';
+import walletConnector from '../wallet';
 
-// Mock interfaces for Civic Pass types
-interface CivicPassConfig {
-  chainId: number;
-  gatekeeperNetwork: string;
-}
+// ════════════════════════════════════════════
+// TYPES
+// ════════════════════════════════════════════
 
 interface CivicPassResult {
   isValid: boolean;
   expiry?: number;
-  gatekeeperNetwork?: string;
+  verificationLevel?: number;
 }
 
 interface CivicProfile {
@@ -34,45 +34,222 @@ interface TrustScoreData {
       totalCount: number;
       successRate: number;
     };
-    doiActivity: {
-      reportsResolved: number;
+    daoActivity: {
       votingAccuracy: number;
+      participation: number;
     };
   };
 }
 
-// Configuration for Civic Pass
-const CIVIC_PASS_CONFIG: CivicPassConfig = {
-  chainId: 1, // Ethereum Mainnet (change to match your target chain)
-  gatekeeperNetwork: process.env.CIVIC_GATEKEEPER_NETWORK || '',
+// ════════════════════════════════════════════
+// CONTRACT ABIs (minimal for reads)
+// ════════════════════════════════════════════
+
+const CIVIC_VERIFIER_ABI = [
+  "function isVerified(address _userAddress) view returns (bool)",
+  "function getVerificationLevel(address _userAddress) view returns (uint256)",
+  "function getUserVerification(address _userAddress) view returns (tuple(bool isVerified, uint256 verificationLevel, uint256 timestamp, uint256 trustScore, uint256 votingAccuracy, uint256 doiParticipation))",
+];
+
+const QUADRATIC_VOTING_ABI = [
+  "function voterAccuracy(address) view returns (uint256)",
+  "function voterParticipation(address) view returns (uint256)",
+  "function isScammer(address) view returns (bool)",
+  "function scamScore(address) view returns (uint256)",
+  "function getVoterStats(address voter) view returns (uint256 accuracy, uint256 participation)",
+];
+
+// Contract addresses (loaded from env or defaults for Monad testnet)
+const CIVIC_VERIFIER_ADDRESS = import.meta.env.VITE_CIVIC_VERIFIER_ADDRESS || '';
+const QUADRATIC_VOTING_ADDRESS = '0x7A791FE5A35131B7D98F854A64e7F94180F27C7B';
+
+// ════════════════════════════════════════════
+// HELPER: Get contract instances
+// ════════════════════════════════════════════
+
+const getProvider = () => {
+  return walletConnector.provider || null;
+};
+
+const getQuadraticVotingContract = () => {
+  const provider = getProvider();
+  if (!provider) return null;
+  try {
+    return new ethers.Contract(QUADRATIC_VOTING_ADDRESS, QUADRATIC_VOTING_ABI, provider);
+  } catch {
+    return null;
+  }
+};
+
+const getCivicVerifierContract = () => {
+  const provider = getProvider();
+  if (!provider || !CIVIC_VERIFIER_ADDRESS) return null;
+  try {
+    return new ethers.Contract(CIVIC_VERIFIER_ADDRESS, CIVIC_VERIFIER_ABI, provider);
+  } catch {
+    return null;
+  }
+};
+
+// ════════════════════════════════════════════
+// LOCAL VERIFICATION CACHE
+// ════════════════════════════════════════════
+
+const VERIFICATION_CACHE_KEY = 'neuroshield_civic_cache';
+
+interface CachedVerification {
+  address: string;
+  isVerified: boolean;
+  verificationLevel: number;
+  timestamp: number;
+  source: 'contract' | 'local';
+}
+
+const getCachedVerification = (address: string): CachedVerification | null => {
+  try {
+    const cache = localStorage.getItem(VERIFICATION_CACHE_KEY);
+    if (!cache) return null;
+    const data: CachedVerification = JSON.parse(cache);
+    // Cache expires after 24 hours
+    if (data.address.toLowerCase() !== address.toLowerCase()) return null;
+    if (Date.now() - data.timestamp > 86400000) return null;
+    return data;
+  } catch {
+    return null;
+  }
+};
+
+const setCachedVerification = (data: CachedVerification) => {
+  try {
+    localStorage.setItem(VERIFICATION_CACHE_KEY, JSON.stringify(data));
+  } catch {
+    // localStorage unavailable
+  }
+};
+
+// ════════════════════════════════════════════
+// CORE FUNCTIONS
+// ════════════════════════════════════════════
+
+/**
+ * Verify user identity using on-chain CivicVerifier contract.
+ * Falls back to local cache if contract not available.
+ * @param address User's wallet address
+ * @returns Verification result
+ */
+export const verifyCivicIdentity = async (address: string): Promise<{
+  isVerified: boolean;
+  verificationLevel?: number;
+  expiry?: number;
+  source: 'contract' | 'local';
+}> => {
+  try {
+    // Try on-chain verification first
+    const civicContract = getCivicVerifierContract();
+    if (civicContract) {
+      const isVerified = await civicContract.isVerified(address);
+      const level = await civicContract.getVerificationLevel(address);
+      
+      const result = {
+        isVerified: Boolean(isVerified),
+        verificationLevel: Number(level),
+        expiry: isVerified ? Date.now() + 86400000 : undefined,
+        source: 'contract' as const,
+      };
+
+      // Cache the result
+      setCachedVerification({
+        address,
+        isVerified: result.isVerified,
+        verificationLevel: result.verificationLevel || 0,
+        timestamp: Date.now(),
+        source: 'contract',
+      });
+
+      return result;
+    }
+
+    // Fallback: check local cache
+    const cached = getCachedVerification(address);
+    if (cached) {
+      return {
+        isVerified: cached.isVerified,
+        verificationLevel: cached.verificationLevel,
+        expiry: cached.timestamp + 86400000,
+        source: 'local',
+      };
+    }
+
+    // Fallback: check if user has DAO participation (proves they're active)
+    const qvContract = getQuadraticVotingContract();
+    if (qvContract) {
+      try {
+        const stats = await qvContract.getVoterStats(address);
+        const participation = Number(stats.participation || 0);
+        
+        if (participation > 0) {
+          // Active DAO participant = implicitly verified
+          const result = {
+            isVerified: true,
+            verificationLevel: participation >= 5 ? 2 : 1,
+            expiry: Date.now() + 86400000,
+            source: 'local' as const,
+          };
+          setCachedVerification({
+            address,
+            isVerified: true,
+            verificationLevel: result.verificationLevel,
+            timestamp: Date.now(),
+            source: 'local',
+          });
+          return result;
+        }
+      } catch {
+        // Contract call failed
+      }
+    }
+
+    // Default: not verified
+    return {
+      isVerified: false,
+      source: 'local',
+    };
+  } catch (error) {
+    console.error('Civic verification failed:', error);
+    return {
+      isVerified: false,
+      source: 'local',
+    };
+  }
 };
 
 /**
  * Initialize Civic Auth client
- * @returns Civic Auth client mock instance
+ * Used by components that need sign-in flow
  */
 export const initializeCivicAuth = async () => {
   try {
-    // Mock client implementation
-    const authClient = {
+    return {
       signIn: async () => {
+        if (!walletConnector.address) {
+          throw new Error('Wallet not connected');
+        }
+        const verification = await verifyCivicIdentity(walletConnector.address);
         return {
-          status: 'success',
+          status: verification.isVerified ? 'success' : 'failed',
           data: {
             wallet: {
-              address: '0x123...',
-              publicKey: '0x456...'
+              address: walletConnector.address,
+              publicKey: walletConnector.address,
             },
             user: {
-              id: 'mock-user-id',
-              email: 'user@example.com'
-            }
-          }
+              id: `civic-${walletConnector.address.slice(2, 10)}`,
+              verified: verification.isVerified,
+            },
+          },
         };
-      }
+      },
     };
-    
-    return authClient;
   } catch (error) {
     console.error('Failed to initialize Civic Auth client:', error);
     throw error;
@@ -80,41 +257,7 @@ export const initializeCivicAuth = async () => {
 };
 
 /**
- * Verify user identity with Civic
- * @param address User's wallet address
- * @returns Verification result
- */
-export const verifyCivicIdentity = async (address: string) => {
-  try {
-    // Mock implementation of Civic Pass verification
-    // In a real implementation, this would call the Civic API
-    
-    // For demo purposes, we'll verify addresses that start with "0x1"
-    const isValid = address.toLowerCase().startsWith("0x1");
-    
-    const verificationResult: CivicPassResult = {
-      isValid,
-      expiry: isValid ? Date.now() + 86400000 : undefined, // Valid for 24 hours
-      gatekeeperNetwork: isValid ? CIVIC_PASS_CONFIG.gatekeeperNetwork : undefined,
-    };
-    
-    return {
-      isVerified: verificationResult.isValid,
-      expiry: verificationResult.expiry,
-      gatekeeperNetwork: verificationResult.gatekeeperNetwork,
-    };
-  } catch (error) {
-    console.error('Civic verification failed:', error);
-    return {
-      isVerified: false,
-      error: 'Verification failed',
-    };
-  }
-};
-
-/**
  * Create wallet through Civic embedded wallet
- * @returns Wallet creation result
  */
 export const createCivicWallet = async () => {
   try {
@@ -125,103 +268,128 @@ export const createCivicWallet = async () => {
       return {
         success: true,
         wallet: response.data.wallet,
-        user: response.data.user
-      };
-    } else {
-      return {
-        success: false,
-        error: 'Failed to create wallet'
+        user: response.data.user,
       };
     }
+    return { success: false, error: 'Verification failed' };
   } catch (error) {
     console.error('Failed to create Civic wallet:', error);
-    return {
-      success: false,
-      error: 'An error occurred during wallet creation'
-    };
+    return { success: false, error: 'An error occurred during wallet creation' };
   }
 };
 
 /**
- * Get Civic profile for a verified user
+ * Get Civic profile for a user.
+ * Pulls real data from on-chain contracts when available.
  * @param address User wallet address
  * @returns Civic profile data
  */
 export const getCivicProfile = async (address: string): Promise<CivicProfile> => {
-  // In a real implementation, this would fetch from Civic API
-  // Mock implementation
-  const mockProfiles: Record<string, CivicProfile> = {
-    // Sample profile for addresses starting with 0x1
-    '0x1': {
-      id: 'civic-123456',
-      name: 'John Doe',
-      avatar: 'https://i.pravatar.cc/150?u=civic123456',
-      email: 'john.doe@example.com',
-      verificationLevel: 'Advanced',
-      verified: true,
-      joinedDate: new Date('2023-01-15')
-    },
+  const verification = await verifyCivicIdentity(address);
+  const shortAddr = address.slice(0, 6) + '...' + address.slice(-4);
+
+  // Try to get on-chain data
+  let daoStats = { accuracy: 0, participation: 0 };
+  const qvContract = getQuadraticVotingContract();
+  if (qvContract) {
+    try {
+      const stats = await qvContract.getVoterStats(address);
+      daoStats = {
+        accuracy: Number(stats.accuracy || 0),
+        participation: Number(stats.participation || 0),
+      };
+    } catch {
+      // Contract call failed
+    }
+  }
+
+  const levelMap: Record<number, string> = {
+    0: 'Unverified',
+    1: 'Basic',
+    2: 'Advanced',
+    3: 'Premium',
   };
-  
-  // Get first character of address
-  const firstChar = address.substring(0, 3).toLowerCase();
-  
-  // Return corresponding profile or generic one
-  return mockProfiles[firstChar] || {
-    id: `civic-${Math.random().toString(36).substring(2, 10)}`,
-    name: 'Unnamed User',
-    verificationLevel: 'Basic',
-    verified: false,
-    joinedDate: new Date()
+
+  return {
+    id: `civic-${address.slice(2, 10)}`,
+    name: `NeuroShield User ${shortAddr}`,
+    avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${address}`,
+    verificationLevel: levelMap[verification.verificationLevel || 0] || 'Basic',
+    verified: verification.isVerified,
+    joinedDate: new Date(),
   };
 };
 
 /**
- * Calculate trust score based on Civic verification and activity
+ * Calculate trust score based on Civic verification + on-chain DAO activity.
+ * This is the real trust score, not mock data.
  * @param address User wallet address
  * @returns Trust score data
  */
 export const calculateTrustScore = async (address: string): Promise<TrustScoreData> => {
-  // Verify civic status first
-  const verificationResult = await verifyCivicIdentity(address);
-  const isVerified = verificationResult.isVerified;
-  
-  // Mock transaction history
-  const txHistory = {
-    totalCount: Math.floor(Math.random() * 100),
-    successRate: 0.8 + (Math.random() * 0.2) // 80% to 100%
-  };
-  
-  // Mock DOI activity
-  const doiActivity = {
-    reportsResolved: Math.floor(Math.random() * 20),
-    votingAccuracy: 0.7 + (Math.random() * 0.3) // 70% to 100%
-  };
-  
-  // Calculate base score
+  const verification = await verifyCivicIdentity(address);
+  const isVerified = verification.isVerified;
+
+  // Get on-chain DAO activity
+  let daoActivity = { votingAccuracy: 0, participation: 0 };
+  const qvContract = getQuadraticVotingContract();
+  if (qvContract) {
+    try {
+      const stats = await qvContract.getVoterStats(address);
+      daoActivity = {
+        votingAccuracy: Number(stats.accuracy || 0),
+        participation: Number(stats.participation || 0),
+      };
+    } catch {
+      // Contract not available
+    }
+  }
+
+  // Get transaction count from provider
+  let txCount = 0;
+  const provider = getProvider();
+  if (provider) {
+    try {
+      txCount = await provider.getTransactionCount(address);
+    } catch {
+      // Provider error
+    }
+  }
+
+  // Calculate trust score from real data
   let baseScore = 0;
-  if (isVerified) baseScore += 50; // +50 for Civic verification
-  baseScore += txHistory.totalCount > 50 ? 15 : (txHistory.totalCount / 50) * 15; // Up to +15 for transaction volume
-  baseScore += txHistory.successRate * 15; // Up to +15 for transaction success rate
-  baseScore += (doiActivity.reportsResolved > 10 ? 10 : doiActivity.reportsResolved) * 1; // Up to +10 for DOI participation
-  baseScore += doiActivity.votingAccuracy * 10; // Up to +10 for voting accuracy
-  
-  // Cap at 100
-  const finalScore = Math.min(Math.round(baseScore), 100);
-  
-  // Determine level
+
+  // +40 for Civic verification
+  if (isVerified) baseScore += 40;
+
+  // +20 for transaction history (scales with count)
+  const txScore = Math.min(20, Math.floor(txCount / 5));
+  baseScore += txScore;
+
+  // +20 for DAO voting accuracy
+  baseScore += Math.floor(daoActivity.votingAccuracy * 0.2);
+
+  // +20 for DAO participation (max at 10+ votes)
+  const participationScore = Math.min(20, daoActivity.participation * 2);
+  baseScore += participationScore;
+
+  const finalScore = Math.min(100, baseScore);
+
   let level: 'High' | 'Medium' | 'Low';
   if (finalScore >= 70) level = 'High';
   else if (finalScore >= 40) level = 'Medium';
   else level = 'Low';
-  
+
   return {
     score: finalScore,
     level,
     factors: {
       civicVerified: isVerified,
-      transactionHistory: txHistory,
-      doiActivity
-    }
+      transactionHistory: {
+        totalCount: txCount,
+        successRate: txCount > 0 ? 0.95 : 0, // Approximate
+      },
+      daoActivity,
+    },
   };
 };

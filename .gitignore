@@ -40,3 +40,7 @@ node_modules
 
 # Hardhat Ignition default folder for deployments against a local node
 ignition/deployments/chain-31337
+
+# Private strategy docs (keep local, don't push)
+HACKATHON_WINNING_PLAN.md
+PROJECT_HONEST_ASSESSMENT.md
