@@ -1,6 +1,6 @@
 # NeuroShield — Soulbound Token (SBT) Implementation
 
-> *"In Web2, your reputation lives on a server someone else owns. They can delete it. They can sell it. In NeuroShield, your reputation is permanently encoded on-chain, bound to your wallet forever — impossible to transfer, impossible to fake, impossible to take down."*
+> _"In Web2, your reputation lives on a server someone else owns. They can delete it. They can sell it. In NeuroShield, your reputation is permanently encoded on-chain, bound to your wallet forever — impossible to transfer, impossible to fake, impossible to take down."_
 
 ---
 
@@ -51,16 +51,17 @@ Implemented **identically** in three places — Solidity decomposition, TypeScri
 
 The core token contract. ERC-721 with soulbound enforcement.
 
-| Function | Description |
-|---|---|
-| `mint(address, level, trustScore, accuracy, participation)` | Mints a new SBT (authorized callers only, one per address) |
-| `updateMetadata(holder, level, trustScore, accuracy, participation)` | Updates existing SBT metadata |
-| `hasSBT(address)` | Check if an address holds an SBT |
-| `getTokenMetadata(address)` | Read the full on-chain metadata struct |
-| `generateTokenURI(tokenId)` | Build Base64-encoded JSON metadata entirely on-chain |
-| `addAuthorizedUpdater(address)` / `removeAuthorizedUpdater(address)` | Admin controls who can mint/update |
+| Function                                                             | Description                                                |
+| -------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `mint(address, level, trustScore, accuracy, participation)`          | Mints a new SBT (authorized callers only, one per address) |
+| `updateMetadata(holder, level, trustScore, accuracy, participation)` | Updates existing SBT metadata                              |
+| `hasSBT(address)`                                                    | Check if an address holds an SBT                           |
+| `getTokenMetadata(address)`                                          | Read the full on-chain metadata struct                     |
+| `generateTokenURI(tokenId)`                                          | Build Base64-encoded JSON metadata entirely on-chain       |
+| `addAuthorizedUpdater(address)` / `removeAuthorizedUpdater(address)` | Admin controls who can mint/update                         |
 
 **Soulbound enforcement** — all four transfer vectors revert:
+
 ```solidity
 function _transfer(address, address, uint256) internal pure override {
     revert("SBTs cannot be transferred");
@@ -77,6 +78,7 @@ function safeTransferFrom(address, address, uint256, bytes memory) public pure o
 ```
 
 **On-chain metadata struct:**
+
 ```solidity
 struct TokenMetadata {
     uint256 issuedAt;
@@ -91,11 +93,11 @@ struct TokenMetadata {
 
 Bridges Civic Pass identity verification → SBT minting.
 
-| Function | Description |
-|---|---|
+| Function                                                                 | Description                                                                    |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
 | `registerVerification(user, level, trustScore, accuracy, participation)` | Checks Civic Pass validity → calls `sbtContract.mint()` or `.updateMetadata()` |
-| `isVerified(address)` | Check if address has passed Civic verification |
-| `getVerificationLevel(address)` | Get user's verification tier |
+| `isVerified(address)`                                                    | Check if address has passed Civic verification                                 |
+| `getVerificationLevel(address)`                                          | Get user's verification tier                                                   |
 
 ---
 
@@ -106,21 +108,25 @@ Bridges Civic Pass identity verification → SBT minting.
 The core frontend service. Talks to both contracts via ethers.js v6.
 
 **Read functions:**
+
 - `hasSBT(address)` → boolean
 - `getOnChainMetadata(address)` → `SBTMetadata | null`
 - `getOnChainTokenURI(address)` → raw Base64 token URI string
 - `getSBTProfile(address)` → composite: metadata + trust breakdown + decoded token URI
 
 **Write functions:**
+
 - `mintSBT(params)` → calls `CivicVerifier.registerVerification()` which triggers SBT mint
 - `updateSBT(params)` → calls `CivicVerifier.registerVerification()` which triggers metadata update
 
 **Trust computation:**
+
 - `computeLiveTrustScore(address)` → real-time score from CivicVerifier + QuadraticVoting + tx count
 - `decomposeOnChainTrustScore(metadata)` → pure function splitting stored score into 4 components
 - `determineVerificationLevel(address, hasCivicPass)` → maps score to level 1/2/3
 
 **Event listeners:**
+
 - `onSBTMinted(callback)` → fires when a new SBT is minted
 - `onMetadataUpdated(callback)` → fires when metadata is updated
 
@@ -129,6 +135,7 @@ The core frontend service. Talks to both contracts via ethers.js v6.
 Trust score calculation with SBT integration.
 
 `calculateTrustScore(address)` has two paths:
+
 1. **Priority 1:** Read from `CivicSBT.getTokenMetadata()` — authoritative on-chain data
 2. **Priority 2:** Compute live from CivicVerifier + QuadraticVoting + provider (fallback when no SBT exists)
 
@@ -137,6 +144,7 @@ Trust score calculation with SBT integration.
 The React UI component.
 
 **When SBT exists:**
+
 - Animated SVG trust score circle
 - 4-bar breakdown (purple/blue/green/amber) with animated progress
 - Verification badge (Basic/Advanced/Premium)
@@ -145,11 +153,13 @@ The React UI component.
 - "Refresh Trust Score On-Chain" button
 
 **When no SBT exists:**
+
 - Live preview of projected trust score
 - "What is a Soulbound Token?" explainer
 - "Mint Your Soulbound Token" gradient button
 
 **States handled:**
+
 - Loading (skeleton animation)
 - Wallet not connected (connect prompt)
 - Minting in progress (spinner)
@@ -158,6 +168,7 @@ The React UI component.
 ### Index.tsx — SBT Tab in Main Navigation
 
 The SBT tab lives in the top nav bar alongside Overview, Analytics, DAO, Reports, Recovery, and Settings. Uses the `Fingerprint` icon. Renders three cards:
+
 1. The `<SoulboundToken />` component
 2. Trust Score Formula explanation
 3. Technical Details panel
@@ -194,32 +205,32 @@ type SBTUpdateEvent struct { ... } // audit log
 
 Go service using go-ethereum to read contracts and PostgreSQL for caching.
 
-| Method | Description |
-|---|---|
-| `HasSBT(address)` | Direct RPC call to CivicSBT |
-| `GetOnChainMetadata(address)` | Direct RPC call returning parsed metadata |
-| `GetSBTProfile(address)` | Cache-first read, triggers background sync if stale (>5 min TTL) |
-| `SyncFromChain(address)` | Reads chain → upserts DB cache |
-| `IsVerified(address)` | Calls CivicVerifier.isVerified() on-chain |
-| `ProcessSBTMintedLog(log)` | Event handler → stores audit record + triggers sync |
-| `ProcessMetadataUpdatedLog(log)` | Event handler → stores audit record + triggers sync |
-| `GetLeaderboard(limit)` | Top N by trust score |
-| `GetStats()` | Aggregate: totalMinted, avgTrustScore, premiumHolders |
-| `ExportSBTData()` | Full JSON export with score breakdowns |
+| Method                           | Description                                                      |
+| -------------------------------- | ---------------------------------------------------------------- |
+| `HasSBT(address)`                | Direct RPC call to CivicSBT                                      |
+| `GetOnChainMetadata(address)`    | Direct RPC call returning parsed metadata                        |
+| `GetSBTProfile(address)`         | Cache-first read, triggers background sync if stale (>5 min TTL) |
+| `SyncFromChain(address)`         | Reads chain → upserts DB cache                                   |
+| `IsVerified(address)`            | Calls CivicVerifier.isVerified() on-chain                        |
+| `ProcessSBTMintedLog(log)`       | Event handler → stores audit record + triggers sync              |
+| `ProcessMetadataUpdatedLog(log)` | Event handler → stores audit record + triggers sync              |
+| `GetLeaderboard(limit)`          | Top N by trust score                                             |
+| `GetStats()`                     | Aggregate: totalMinted, avgTrustScore, premiumHolders            |
+| `ExportSBTData()`                | Full JSON export with score breakdowns                           |
 
 ### handlers/sbt.go — `backend/handlers/sbt.go` (~210 lines)
 
 REST API endpoints:
 
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/api/sbt/profile/:address` | Full profile + trust breakdown |
-| GET | `/api/sbt/trust/:address` | Decomposed score with formula explanation |
-| GET | `/api/sbt/check/:address` | On-chain hasSBT + isVerified check |
-| POST | `/api/sbt/sync/:address` | Force re-sync from chain |
-| GET | `/api/sbt/leaderboard?limit=20` | Top users by trust score |
-| GET | `/api/sbt/stats` | Aggregate statistics |
-| GET | `/api/sbt/export` | Full data export |
+| Method | Endpoint                        | Description                               |
+| ------ | ------------------------------- | ----------------------------------------- |
+| GET    | `/api/sbt/profile/:address`     | Full profile + trust breakdown            |
+| GET    | `/api/sbt/trust/:address`       | Decomposed score with formula explanation |
+| GET    | `/api/sbt/check/:address`       | On-chain hasSBT + isVerified check        |
+| POST   | `/api/sbt/sync/:address`        | Force re-sync from chain                  |
+| GET    | `/api/sbt/leaderboard?limit=20` | Top users by trust score                  |
+| GET    | `/api/sbt/stats`                | Aggregate statistics                      |
+| GET    | `/api/sbt/export`               | Full data export                          |
 
 ### routes/routes.go — Route Wiring
 
@@ -234,6 +245,7 @@ REST API endpoints:
 ### Deploy Script — `hardhat/scripts/deploy-civic.js` (~90 lines)
 
 Deploys contracts in order:
+
 1. `MockCivicPass` — test stand-in for real Civic Pass
 2. `CivicSBT` — the SBT contract
 3. `CivicVerifier(mockCivicPassAddr, civicSBTAddr)` — the bridge
@@ -247,12 +259,14 @@ Deploys contracts in order:
 ### Environment Variables
 
 **Frontend (.env):**
+
 ```
 VITE_CIVIC_SBT_ADDRESS=0x...
 VITE_CIVIC_VERIFIER_ADDRESS=0x...
 ```
 
 **Backend (.env):**
+
 ```
 CIVIC_SBT_ADDRESS=0x...
 CIVIC_VERIFIER_ADDRESS=0x...
@@ -282,22 +296,22 @@ User clicks "Mint Your Soulbound Token"
 
 ## File Manifest
 
-| Layer | File | Lines | Purpose |
-|---|---|---|---|
-| Contract | `hardhat/contracts/civic/CivicSBT.sol` | ~230 | Soulbound ERC-721 token |
-| Contract | `hardhat/contracts/civic/CivicVerifier.sol` | ~175 | Civic Pass → SBT bridge |
-| Frontend | `src/web3/civic/sbt.ts` | ~626 | Contract interaction service |
-| Frontend | `src/web3/civic/auth.ts` | ~370 | Trust score with SBT priority |
-| Frontend | `src/components/SoulboundToken.tsx` | ~518 | React UI component |
-| Frontend | `src/pages/Index.tsx` (SBT section) | ~70 | Main nav SBT tab |
-| Frontend | `src/web3/abi/CivicSBT.json` | — | Compiled ABI |
-| Frontend | `src/web3/abi/CivicVerifier.json` | — | Compiled ABI |
-| Backend | `backend/models/sbt.go` | ~85 | GORM DB models |
-| Backend | `backend/services/sbt.go` | ~432 | Go service (chain + cache) |
-| Backend | `backend/handlers/sbt.go` | ~210 | REST API handlers |
-| Backend | `backend/routes/routes.go` (SBT section) | ~20 | Route wiring |
-| Deploy | `hardhat/scripts/deploy-civic.js` | ~90 | Deployment script |
-| Config | `src/web3/addresses.json` | — | Contract address registry |
+| Layer    | File                                        | Lines | Purpose                       |
+| -------- | ------------------------------------------- | ----- | ----------------------------- |
+| Contract | `hardhat/contracts/civic/CivicSBT.sol`      | ~230  | Soulbound ERC-721 token       |
+| Contract | `hardhat/contracts/civic/CivicVerifier.sol` | ~175  | Civic Pass → SBT bridge       |
+| Frontend | `src/web3/civic/sbt.ts`                     | ~626  | Contract interaction service  |
+| Frontend | `src/web3/civic/auth.ts`                    | ~370  | Trust score with SBT priority |
+| Frontend | `src/components/SoulboundToken.tsx`         | ~518  | React UI component            |
+| Frontend | `src/pages/Index.tsx` (SBT section)         | ~70   | Main nav SBT tab              |
+| Frontend | `src/web3/abi/CivicSBT.json`                | —     | Compiled ABI                  |
+| Frontend | `src/web3/abi/CivicVerifier.json`           | —     | Compiled ABI                  |
+| Backend  | `backend/models/sbt.go`                     | ~85   | GORM DB models                |
+| Backend  | `backend/services/sbt.go`                   | ~432  | Go service (chain + cache)    |
+| Backend  | `backend/handlers/sbt.go`                   | ~210  | REST API handlers             |
+| Backend  | `backend/routes/routes.go` (SBT section)    | ~20   | Route wiring                  |
+| Deploy   | `hardhat/scripts/deploy-civic.js`           | ~90   | Deployment script             |
+| Config   | `src/web3/addresses.json`                   | —     | Contract address registry     |
 
 **Total:** ~2,800+ lines of production SBT code across 14 files spanning Solidity, TypeScript, Go, and deployment infrastructure.
 
