@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   Shield,
   AlertTriangle,
-  CheckCircle,
   Zap,
   Users,
   FileText,
@@ -47,7 +46,6 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [aiScansToday, setAiScansToday] = useState(0);
   const [blockedThreats, setBlockedThreats] = useState(0);
-
 
   // Report form state
   const [reportAddress, setReportAddress] = useState("");
@@ -93,7 +91,6 @@ const Index = () => {
         // Saved amount = sum of values from blocked txs (displayed as USD estimate)
         const totalSaved = blocked.reduce((sum, l) => sum + (l.value || 0), 0);
 
-
         // Security score from log quality
         const baseScore = Math.min(30, logs.length * 2);
         const blockBonus = Math.min(40, blocked.length * 5);
@@ -138,8 +135,6 @@ const Index = () => {
       return () => clearTimeout(timer);
     }
   }, [threatLevel, showInterceptor, isProcessing, toast]);
-
-
 
   const simulateScamTransaction = () => {
     if (isProcessing) return;
@@ -416,30 +411,43 @@ const Index = () => {
       </header>
 
       {/* Hero Landing Section */}
-      <div className="relative overflow-hidden">
+      <div className="relative overflow-hidden border-b border-white/[0.06]">
         {/* Animated background elements */}
-        <div className="absolute inset-0 z-0">
-          <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-purple-500/20 rounded-full filter blur-3xl animate-pulse"></div>
-          <div className="absolute top-1/3 right-1/3 w-96 h-96 bg-cyan-500/20 rounded-full filter blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute inset-0 z-0 pointer-events-none">
+          <div className="absolute top-1/4 left-1/6 w-64 h-64 bg-purple-500/15 rounded-full filter blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-cyan-500/15 rounded-full filter blur-3xl animate-pulse delay-1000"></div>
         </div>
 
-        <div className="container mx-auto px-6 py-12 lg:py-16 relative z-10">
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
+        <div className="container mx-auto px-6 py-14 lg:py-20 relative z-10">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-16">
             {/* Left side content */}
             <div className="flex-1 space-y-6 text-center lg:text-left">
-              <h1 className="text-4xl lg:text-5xl font-bold text-white leading-tight">
+              <h1
+                className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-[1.1] tracking-tight"
+                style={{
+                  fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+                  letterSpacing: "-0.03em",
+                }}
+              >
                 Secure Your{" "}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500">
                   Digital Assets
-                </span>{" "}
-                with AI
+                </span>
+                <br />
+                <span className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white/80">
+                  with AI
+                </span>
               </h1>
-              <p className="text-lg text-gray-300 max-w-xl">
-                AI-powered smart wallet with real-time threat detection, DAO-driven scam reporting, and on-chain Soulbound identity.
+              <p
+                className="text-base sm:text-lg text-gray-400 max-w-lg leading-relaxed"
+                style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
+              >
+                AI-powered smart wallet with real-time threat detection,
+                DAO-driven scam reporting, and on-chain Soulbound identity.
               </p>
-              <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
+              <div className="flex flex-wrap gap-3 justify-center lg:justify-start pt-1">
                 <Button
-                  className="bg-cyan-500 hover:bg-cyan-600 text-white px-6 py-5 text-base rounded-xl transition-all hover:scale-105"
+                  className="bg-cyan-500 hover:bg-cyan-600 text-white px-7 py-5 text-sm font-semibold rounded-xl transition-all hover:scale-105 shadow-lg shadow-cyan-500/20"
                   onClick={() => navigate("/send")}
                 >
                   <Shield className="w-4 h-4 mr-2" />
@@ -447,52 +455,31 @@ const Index = () => {
                 </Button>
                 <Button
                   variant="outline"
-                  className="border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10 px-6 py-5 text-base rounded-xl transition-all hover:scale-105"
+                  className="border-white/15 text-gray-300 hover:bg-white/5 hover:text-white px-7 py-5 text-sm font-semibold rounded-xl transition-all hover:scale-105"
                   onClick={simulateScamTransaction}
                 >
                   <Zap className="w-4 h-4 mr-2" />
                   Try AI Demo
                 </Button>
               </div>
-              <div className="flex items-center gap-6 justify-center lg:justify-start pt-2">
-                <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-white/5 border border-white/10">
-                  <Shield className="w-5 h-5 text-cyan-400" />
-                  <div className="text-left">
-                    <div className="text-lg font-bold text-white">{aiScansToday}</div>
-                    <div className="text-xs text-gray-400">Scans</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-white/5 border border-white/10">
-                  <AlertTriangle className="w-5 h-5 text-amber-400" />
-                  <div className="text-left">
-                    <div className="text-lg font-bold text-white">{blockedThreats}</div>
-                    <div className="text-xs text-gray-400">Blocked</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-white/5 border border-white/10">
-                  <CheckCircle className="w-5 h-5 text-emerald-400" />
-                  <div className="text-left">
-                    <div className="text-lg font-bold text-white">{securityScore}</div>
-                    <div className="text-xs text-gray-400">Score</div>
-                  </div>
-                </div>
-              </div>
             </div>
-            {/* Right side — compact wallet card */}
-            <div className="flex-1 flex justify-center">
-              <div className="relative w-72 lg:w-80">
-                <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl border border-white/10 shadow-2xl backdrop-blur-xl p-6">
-                  <div className="flex justify-between items-center mb-6">
-                    <Shield className="h-8 w-8 text-cyan-400" />
+
+            {/* Right side — 3D Y-axis spinning wallet card (front + back) */}
+            <div className="flex-1 flex justify-center card-scene">
+              <div className="relative w-72 lg:w-80 card-spinner" style={{ aspectRatio: "4/5" }}>
+                {/* ===== FRONT FACE ===== */}
+                <div className="card-face bg-gradient-to-br from-slate-800/90 to-slate-900/90 rounded-2xl border border-white/10 shadow-2xl backdrop-blur-xl p-6">
+                  <div className="flex justify-between items-center mb-5">
+                    <Shield className="h-7 w-7 text-cyan-400" />
                     <div className="flex space-x-1.5">
                       {[...Array(3)].map((_, i) => (
                         <div key={i} className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></div>
                       ))}
                     </div>
                   </div>
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <div>
-                      <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Wallet</div>
+                      <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-0.5">Wallet</div>
                       <div className="text-sm text-white font-mono">
                         {currentAddress
                           ? `${currentAddress.slice(0, 6)}...${currentAddress.slice(-4)}`
@@ -500,27 +487,60 @@ const Index = () => {
                       </div>
                     </div>
                     <div>
-                      <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Shield Level</div>
-                      <div className="text-sm text-cyan-400 font-medium">{shieldLevel}</div>
+                      <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-0.5">Shield Level</div>
+                      <div className="text-sm text-cyan-400 font-semibold">{shieldLevel}</div>
                     </div>
                   </div>
-                  <div className="mt-6 grid grid-cols-3 gap-2">
-                    <div className="p-2 bg-white/5 rounded-lg text-center">
+                  <div className="mt-5 grid grid-cols-3 gap-2">
+                    <div className="p-2 bg-white/[0.04] rounded-lg text-center border border-white/[0.06]">
                       <div className="text-sm font-bold text-white">{aiScansToday}</div>
                       <div className="text-[9px] text-gray-500">Scans</div>
                     </div>
-                    <div className="p-2 bg-white/5 rounded-lg text-center">
+                    <div className="p-2 bg-white/[0.04] rounded-lg text-center border border-white/[0.06]">
                       <div className="text-sm font-bold text-white">{blockedThreats}</div>
                       <div className="text-[9px] text-gray-500">Blocked</div>
                     </div>
-                    <div className="p-2 bg-white/5 rounded-lg text-center">
+                    <div className="p-2 bg-white/[0.04] rounded-lg text-center border border-white/[0.06]">
                       <div className="text-sm font-bold text-white">{securityScore}</div>
                       <div className="text-[9px] text-gray-500">Score</div>
                     </div>
                   </div>
                 </div>
-                {/* Subtle glow */}
-                <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 rounded-2xl blur-xl -z-10"></div>
+
+                {/* ===== BACK FACE ===== */}
+                <div className="card-face-back bg-gradient-to-br from-purple-900/90 to-slate-900/90 rounded-2xl border border-purple-400/20 shadow-2xl backdrop-blur-xl p-6">
+                  <div className="flex justify-between items-center mb-5">
+                    <Zap className="h-7 w-7 text-purple-400" />
+                    <span className="text-[10px] uppercase tracking-widest text-purple-400 font-semibold">NeuroShield</span>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-0.5">Network</div>
+                      <div className="text-sm text-white font-mono">Monad Testnet</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-0.5">Protection</div>
+                      <div className="text-sm text-purple-300 font-semibold">AI + DAO + SBT</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-0.5">Status</div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
+                        <span className="text-sm text-green-400 font-semibold">Active</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-5 p-3 bg-white/[0.04] rounded-lg border border-white/[0.06] text-center">
+                    <div className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400">
+                      NeuroShield
+                    </div>
+                    <div className="text-[10px] text-gray-400 mt-1">Hack4Bengal 5.0</div>
+                    <div className="text-[9px] text-gray-500 mt-0.5">Secured by Smart Contracts</div>
+                  </div>
+                </div>
+
+                {/* Glow follows the card */}
+                <div className="absolute -inset-2 bg-gradient-to-r from-cyan-500/15 to-purple-500/15 rounded-3xl blur-2xl -z-10"></div>
               </div>
             </div>
           </div>
@@ -547,16 +567,22 @@ const Index = () => {
                       </div>
                       <div className="flex-1 space-y-3">
                         <div>
-                          <h3 className="text-base font-semibold text-white">Send Tokens</h3>
+                          <h3 className="text-base font-semibold text-white">
+                            Send Tokens
+                          </h3>
                           <p className="text-xs text-gray-400 mt-1">
-                            Every outgoing transaction is scanned by our ML fraud detection model before your wallet signs.
+                            Every outgoing transaction is scanned by our ML
+                            fraud detection model before your wallet signs.
                           </p>
                         </div>
                         <Button
                           asChild
                           className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 w-full rounded-lg h-9 text-sm"
                         >
-                          <Link to="/send" className="flex items-center justify-center gap-2">
+                          <Link
+                            to="/send"
+                            className="flex items-center justify-center gap-2"
+                          >
                             Send Securely
                             <Zap className="w-3.5 h-3.5" />
                           </Link>
@@ -575,9 +601,12 @@ const Index = () => {
                       </div>
                       <div className="flex-1 space-y-3">
                         <div>
-                          <h3 className="text-base font-semibold text-white">AI Threat Demo</h3>
+                          <h3 className="text-base font-semibold text-white">
+                            AI Threat Demo
+                          </h3>
                           <p className="text-xs text-gray-400 mt-1">
-                            Simulate a scam transaction to see the ML model intercept and analyze it in real time.
+                            Simulate a scam transaction to see the ML model
+                            intercept and analyze it in real time.
                           </p>
                         </div>
                         <Button

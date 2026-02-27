@@ -4,7 +4,8 @@
 
 /* Custom animations for wallet and orbital elements */
 @keyframes float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0px);
   }
   50% {
@@ -36,6 +37,44 @@
 
 .animate-orbit-oval {
   animation: orbit-oval 30s linear infinite;
+}
+
+@keyframes spin-y {
+  0% {
+    transform: rotateY(0deg);
+  }
+  100% {
+    transform: rotateY(360deg);
+  }
+}
+
+.card-scene {
+  perspective: 900px;
+}
+
+.card-spinner {
+  animation: spin-y 7s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  transform-style: preserve-3d;
+  position: relative;
+}
+
+.card-spinner:hover {
+  animation-play-state: paused;
+}
+
+.card-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  position: absolute;
+  inset: 0;
+}
+
+.card-face-back {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: rotateY(180deg);
+  position: absolute;
+  inset: 0;
 }
 
 @layer base {
