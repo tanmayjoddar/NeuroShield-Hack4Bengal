@@ -23,8 +23,6 @@ import DAOPanel from "@/components/dao/DAOPanel";
 import TransactionInterceptor from "@/components/TransactionInterceptor";
 import SecurityScore from "@/components/SecurityScore";
 import AILearningFeedback from "@/components/AILearningFeedback";
-import TelegramCompanion from "@/components/TelegramCompanion";
-import TelegramSettings from "@/components/TelegramSettings";
 import WalletAnalytics from "@/components/WalletAnalytics";
 import GuardianManager from "@/components/GuardianManager";
 import { useCivicStore } from "@/stores/civicStore";
@@ -1080,8 +1078,7 @@ const Index = () => {
                 </CardContent>
               </Card>
 
-              {/* Telegram Settings Integration */}
-              <TelegramSettings walletAddress={currentAddress} />
+
             </div>
           )}
         </main>
@@ -1106,8 +1103,7 @@ const Index = () => {
         onComplete={() => setShowAIFeedback(false)}
       />
 
-      {/* Telegram Companion */}
-      <TelegramCompanion />
+
     </div>
   );
 };

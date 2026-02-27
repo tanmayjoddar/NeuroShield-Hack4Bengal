@@ -73,10 +73,6 @@ NeuroShield protects your transactions from front-running and sandwich attacks. 
 
 Visualize your on-chain footprint — transaction patterns, token flows, spending behavior, and risk indicators. The same 18 features the ML model uses to score transactions are displayed as charts so you can understand exactly what the AI sees.
 
-### Telegram Bot Companion
-
-Get real-time scam alerts on your phone. The `@unhackable_wallet_bot` sends push notifications when threats are detected, lets you submit quick reports from mobile, and syncs your protection status across desktop and Telegram.
-
 ---
 
 ## How It Works — The Architecture
@@ -229,7 +225,7 @@ NeuroShield-Hack4Bengal/
 | ML Model        | Python, scikit-learn, Flask, 18-feature fraud classifier          |
 | Identity        | Civic Auth (face biometrics), Soulbound Tokens                    |
 | Blockchain      | Monad Testnet (EVM-compatible, 10k+ TPS)                          |
-| Notifications   | Telegram Bot API                                                  |
+
 
 ---
 
