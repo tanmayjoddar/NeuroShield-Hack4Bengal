@@ -226,7 +226,6 @@ NeuroShield-Hack4Bengal/
 | Identity        | Civic Auth (face biometrics), Soulbound Tokens                    |
 | Blockchain      | Monad Testnet (EVM-compatible, 10k+ TPS)                          |
 
-
 ---
 
 ## 📄 Documentation

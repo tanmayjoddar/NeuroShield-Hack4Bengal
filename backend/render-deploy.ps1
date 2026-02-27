@@ -36,13 +36,13 @@ switch ($choice) {
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "`nBuild successful!" -ForegroundColor Green
                 Write-Host "Running the application locally..." -ForegroundColor Yellow
-                
+
                 # Start the application in a new PowerShell window
                 Start-Process powershell -ArgumentList "-Command", ".\app.exe" -NoNewWindow
                 Write-Host "`nApplication running on http://localhost:8080" -ForegroundColor Green
                 Write-Host "Press any key to stop the application..." -ForegroundColor Yellow
                 $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-                
+
                 # Find and stop the process
                 $process = Get-Process -Name "app" -ErrorAction SilentlyContinue
                 if ($process) {
@@ -62,7 +62,7 @@ switch ($choice) {
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "`nBuild successful! Testing container..." -ForegroundColor Green
                 Write-Host "Running container with environment variables from .env file" -ForegroundColor Yellow
-                
+
                 # Run the container
                 docker run -d --name wallet-backend-test -p 8080:8080 --env-file .env wallet-backend-render
                 Write-Host "`nContainer running on http://localhost:8080" -ForegroundColor Green
@@ -79,7 +79,7 @@ switch ($choice) {
     }    "3" {
         Write-Host "`nRender Deployment Instructions:" -ForegroundColor Cyan
         Write-Host "==============================" -ForegroundColor Cyan
-        
+
         Write-Host "`nMethod 1: Automatic Deployment with render.yaml (Recommended)" -ForegroundColor White
         Write-Host "1. Push your code to your GitHub repository" -ForegroundColor White
         Write-Host "2. Log in to Render dashboard at https://dashboard.render.com" -ForegroundColor White
@@ -87,7 +87,7 @@ switch ($choice) {
         Write-Host "4. Connect and select your GitHub repository" -ForegroundColor White
         Write-Host "5. Render will detect render.yaml and configure services automatically" -ForegroundColor White
         Write-Host "`n6. Set the following environment variables:" -ForegroundColor White
-        
+
         # Read env file to suggest values
         if (Test-Path ".env") {
             $envFile = Get-Content ".env" | Where-Object { $_ -notmatch "^#" -and $_.Trim() -ne "" }
@@ -106,7 +106,7 @@ switch ($choice) {
             Write-Host "   CHAIN_ID = 11155111" -ForegroundColor Yellow
         }
           Write-Host "`n7. Click 'Apply' to start the deployment process" -ForegroundColor White
-        
+
         Write-Host "`nMethod 2: Manual Deployment" -ForegroundColor White
         Write-Host "1. Log in to Render dashboard at https://dashboard.render.com" -ForegroundColor White
         Write-Host "2. Click 'New' and select 'Web Service'" -ForegroundColor White
@@ -117,7 +117,7 @@ switch ($choice) {
         Write-Host "   - Health Check Path: /health" -ForegroundColor White
         Write-Host "5. Add environment variables listed above" -ForegroundColor White
         Write-Host "6. Click 'Create Web Service'" -ForegroundColor White
-        
+
         Write-Host "`nFor more details, see RENDER_DEPLOYMENT.md or visit: https://render.com/docs/deploy-go-app" -ForegroundColor Cyan
     }
     "4" {

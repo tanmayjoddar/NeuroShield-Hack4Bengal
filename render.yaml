@@ -27,7 +27,7 @@ services:
         sync: false  # Set this secret in Render dashboard
       - key: CHAIN_ID
         value: "11155111"  # Sepolia testnet
-  
+
   # Optional: Add a PostgreSQL database if you don't have one already
   - type: pserv
     name: wallet-postgres

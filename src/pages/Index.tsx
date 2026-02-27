@@ -17,7 +17,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import WalletConnect from "@/components/WalletConnect";
-import ThreatMonitor from "@/components/ThreatMonitor";
 import TransactionHistory from "@/components/TransactionHistory";
 import DAOPanel from "@/components/dao/DAOPanel";
 import TransactionInterceptor from "@/components/TransactionInterceptor";
@@ -27,7 +26,6 @@ import WalletAnalytics from "@/components/WalletAnalytics";
 import GuardianManager from "@/components/GuardianManager";
 import { useCivicStore } from "@/stores/civicStore";
 import SimpleCivicAuth from "@/components/civic/SimpleCivicAuth";
-import MEVProtectionTester from "@/components/MEVProtectionTester";
 import SoulboundToken from "@/components/SoulboundToken";
 import { reportScam } from "@/web3/contract";
 
@@ -49,7 +47,7 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [aiScansToday, setAiScansToday] = useState(0);
   const [blockedThreats, setBlockedThreats] = useState(0);
-  const [savedAmount, setSavedAmount] = useState(0);
+
 
   // Report form state
   const [reportAddress, setReportAddress] = useState("");
@@ -94,7 +92,7 @@ const Index = () => {
 
         // Saved amount = sum of values from blocked txs (displayed as USD estimate)
         const totalSaved = blocked.reduce((sum, l) => sum + (l.value || 0), 0);
-        setSavedAmount(Math.round(totalSaved * 3200)); // rough ETH→USD
+
 
         // Security score from log quality
         const baseScore = Math.min(30, logs.length * 2);
@@ -141,18 +139,7 @@ const Index = () => {
     }
   }, [threatLevel, showInterceptor, isProcessing, toast]);
 
-  const getThreatColor = (level: string) => {
-    switch (level) {
-      case "safe":
-        return "text-green-500 bg-green-100";
-      case "warning":
-        return "text-yellow-500 bg-yellow-100";
-      case "danger":
-        return "text-red-500 bg-red-100";
-      default:
-        return "text-gray-500 bg-gray-100";
-    }
-  };
+
 
   const simulateScamTransaction = () => {
     if (isProcessing) return;
@@ -190,7 +177,7 @@ const Index = () => {
     console.log("Transaction blocked by user");
 
     setBlockedThreats((prev) => prev + 1);
-    setSavedAmount((prev) => prev + Math.floor(Math.random() * 5000) + 1000);
+
     setSecurityScore((prev) => Math.min(100, prev + 3));
     setLastAction("block");
     setShowAIFeedback(true);
@@ -432,152 +419,109 @@ const Index = () => {
       <div className="relative overflow-hidden">
         {/* Animated background elements */}
         <div className="absolute inset-0 z-0">
-          <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-purple-500/30 rounded-full filter blur-3xl animate-pulse"></div>
-          <div className="absolute top-1/3 right-1/3 w-96 h-96 bg-cyan-500/30 rounded-full filter blur-3xl animate-pulse delay-1000"></div>
+          <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-purple-500/20 rounded-full filter blur-3xl animate-pulse"></div>
+          <div className="absolute top-1/3 right-1/3 w-96 h-96 bg-cyan-500/20 rounded-full filter blur-3xl animate-pulse delay-1000"></div>
         </div>
 
-        <div className="container mx-auto px-6 py-16 relative z-10">
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-12">
+        <div className="container mx-auto px-6 py-12 lg:py-16 relative z-10">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
             {/* Left side content */}
-            <div className="flex-1 space-y-8 text-center lg:text-left">
-              <h1 className="text-5xl lg:text-6xl font-bold text-white leading-tight animate-fade-in-up">
+            <div className="flex-1 space-y-6 text-center lg:text-left">
+              <h1 className="text-4xl lg:text-5xl font-bold text-white leading-tight">
                 Secure Your{" "}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400">
                   Digital Assets
                 </span>{" "}
                 with AI
               </h1>
-              <p className="text-xl text-gray-300 animate-fade-in-up animation-delay-200">
-                The world's first AI-powered smart wallet with real-time threat
-                detection and autonomous security features.
+              <p className="text-lg text-gray-300 max-w-xl">
+                AI-powered smart wallet with real-time threat detection, DAO-driven scam reporting, and on-chain Soulbound identity.
               </p>
-              <div className="flex flex-wrap gap-4 justify-center lg:justify-start animate-fade-in-up animation-delay-300">
+              <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
                 <Button
-                  className="bg-cyan-500 hover:bg-cyan-600 text-white px-8 py-6 text-lg rounded-xl transition-all hover:scale-105"
+                  className="bg-cyan-500 hover:bg-cyan-600 text-white px-6 py-5 text-base rounded-xl transition-all hover:scale-105"
                   onClick={() => navigate("/send")}
                 >
+                  <Shield className="w-4 h-4 mr-2" />
                   Send Tokens
                 </Button>
                 <Button
                   variant="outline"
-                  className="border-cyan-500 text-cyan-400 hover:bg-cyan-500/10 px-8 py-6 text-lg rounded-xl transition-all hover:scale-105"
+                  className="border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10 px-6 py-5 text-base rounded-xl transition-all hover:scale-105"
                   onClick={simulateScamTransaction}
                 >
+                  <Zap className="w-4 h-4 mr-2" />
                   Try AI Demo
                 </Button>
               </div>
-              <div className="flex items-center gap-8 justify-center lg:justify-start animate-fade-in-up animation-delay-400">
-                <div className="flex -space-x-4">
-                  {[...Array(4)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="w-12 h-12 rounded-full border-2 border-white bg-gradient-to-r from-purple-400 to-cyan-400"
-                    ></div>
-                  ))}
-                </div>
-                <div className="text-left">
-                  <div className="text-2xl font-bold text-white">
-                    {aiScansToday}
+              <div className="flex items-center gap-6 justify-center lg:justify-start pt-2">
+                <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-white/5 border border-white/10">
+                  <Shield className="w-5 h-5 text-cyan-400" />
+                  <div className="text-left">
+                    <div className="text-lg font-bold text-white">{aiScansToday}</div>
+                    <div className="text-xs text-gray-400">Scans</div>
                   </div>
-                  <div className="text-gray-400">Transactions Scanned</div>
+                </div>
+                <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-white/5 border border-white/10">
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                  <div className="text-left">
+                    <div className="text-lg font-bold text-white">{blockedThreats}</div>
+                    <div className="text-xs text-gray-400">Blocked</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-white/5 border border-white/10">
+                  <CheckCircle className="w-5 h-5 text-emerald-400" />
+                  <div className="text-left">
+                    <div className="text-lg font-bold text-white">{securityScore}</div>
+                    <div className="text-xs text-gray-400">Score</div>
+                  </div>
                 </div>
               </div>
-            </div>{" "}
-            {/* Right side animated wallet visualization */}
-            <div className="flex-1 relative animate-float">
-              <div className="relative w-full aspect-square max-w-[400px] mx-auto">
-                {/* Spinning Crypto Icons */}
-                <div className="absolute inset-0 -m-20">
-                  {/* Bitcoin */}
-                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                    <div className="w-64 h-64 animate-spin-slow">
-                      <div className="absolute top-0 transform -translate-x-1/2">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 shadow-lg flex items-center justify-center text-2xl">
-                          ₿
-                        </div>
-                      </div>
-                      <div className="absolute top-1/2 right-0 transform translate-y-1/2">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 shadow-lg flex items-center justify-center text-xl">
-                          Ξ
-                        </div>
-                      </div>
-                      <div className="absolute bottom-0 transform -translate-x-1/2">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-r from-green-400 to-green-600 shadow-lg flex items-center justify-center">
-                          ₳
-                        </div>
-                      </div>
-                      <div className="absolute top-1/2 left-0 transform -translate-y-1/2">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-r from-purple-400 to-purple-600 shadow-lg flex items-center justify-center">
-                          ◎
-                        </div>
-                      </div>
+            </div>
+            {/* Right side — compact wallet card */}
+            <div className="flex-1 flex justify-center">
+              <div className="relative w-72 lg:w-80">
+                <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl border border-white/10 shadow-2xl backdrop-blur-xl p-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <Shield className="h-8 w-8 text-cyan-400" />
+                    <div className="flex space-x-1.5">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></div>
+                      ))}
                     </div>
                   </div>
-                </div>
-
-                {/* Main wallet card */}
-                <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl border border-white/10 shadow-2xl backdrop-blur-xl p-6 transform rotate-6 hover:rotate-0 transition-transform duration-500 scale-75">
-                  {/* Wallet content */}
-                  <div className="h-full flex flex-col">
-                    <div className="flex justify-between items-center mb-8">
-                      <Shield className="h-10 w-10 text-cyan-400" />
-                      <div className="flex space-x-2">
-                        {[...Array(3)].map((_, i) => (
-                          <div
-                            key={i}
-                            className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse delay-100"
-                          ></div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="text-xs text-gray-400 uppercase tracking-wider">
-                        Wallet
-                      </div>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Wallet</div>
                       <div className="text-sm text-white font-mono">
                         {currentAddress
                           ? `${currentAddress.slice(0, 6)}...${currentAddress.slice(-4)}`
                           : "Not Connected"}
                       </div>
-                      <div className="text-xs text-gray-400 uppercase tracking-wider mt-3">
-                        Shield Level
-                      </div>
-                      <div className="text-sm text-cyan-400 font-medium">
-                        {shieldLevel}
-                      </div>
                     </div>
-                    <div className="mt-auto">
-                      <div className="grid grid-cols-3 gap-4 text-center">
-                        <div className="p-2 bg-white/5 rounded-lg">
-                          <div className="text-sm font-bold text-white">
-                            {aiScansToday}
-                          </div>
-                          <div className="text-[10px] text-gray-400">Scans</div>
-                        </div>
-                        <div className="p-2 bg-white/5 rounded-lg">
-                          <div className="text-sm font-bold text-white">
-                            {blockedThreats}
-                          </div>
-                          <div className="text-[10px] text-gray-400">
-                            Blocked
-                          </div>
-                        </div>
-                        <div className="p-2 bg-white/5 rounded-lg">
-                          <div className="text-sm font-bold text-white">
-                            {securityScore}
-                          </div>
-                          <div className="text-[10px] text-gray-400">Score</div>
-                        </div>
-                      </div>
+                    <div>
+                      <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Shield Level</div>
+                      <div className="text-sm text-cyan-400 font-medium">{shieldLevel}</div>
+                    </div>
+                  </div>
+                  <div className="mt-6 grid grid-cols-3 gap-2">
+                    <div className="p-2 bg-white/5 rounded-lg text-center">
+                      <div className="text-sm font-bold text-white">{aiScansToday}</div>
+                      <div className="text-[9px] text-gray-500">Scans</div>
+                    </div>
+                    <div className="p-2 bg-white/5 rounded-lg text-center">
+                      <div className="text-sm font-bold text-white">{blockedThreats}</div>
+                      <div className="text-[9px] text-gray-500">Blocked</div>
+                    </div>
+                    <div className="p-2 bg-white/5 rounded-lg text-center">
+                      <div className="text-sm font-bold text-white">{securityScore}</div>
+                      <div className="text-[9px] text-gray-500">Score</div>
                     </div>
                   </div>
                 </div>
-                {/* Floating security elements */}
-                <div className="absolute -top-4 -right-4 w-20 h-20 bg-cyan-500/20 rounded-full animate-float-slow"></div>
-                <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-purple-500/20 rounded-full animate-float-delayed"></div>
+                {/* Subtle glow */}
+                <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 rounded-2xl blur-xl -z-10"></div>
               </div>
-              {/* AI scanning effect */}
-              <div className="absolute inset-0 bg-gradient-to-t from-cyan-500/20 via-transparent to-transparent animate-scan"></div>
             </div>
           </div>
         </div>
@@ -589,165 +533,72 @@ const Index = () => {
         <main className="container mx-auto px-6 py-8">
           {activeTab === "overview" && (
             <div className="space-y-6">
-              {/* Security Score Card */}
-              <SecurityScore /> {/* Threat Status Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className="group bg-black/20 backdrop-blur-lg border-white/10 hover:bg-black/30 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-cyan-500/20">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-400 group-hover:text-white transition-colors">
-                      Threat Level
-                    </CardTitle>
-                    <AlertTriangle
-                      className={`h-4 w-4 transform group-hover:scale-110 transition-all ${threatLevel === "danger" ? "text-red-500" : threatLevel === "warning" ? "text-yellow-500" : "text-green-500"}`}
-                    />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-white capitalize group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-cyan-400 group-hover:to-purple-400 transition-all">
-                      {threatLevel}
-                    </div>
-                    <Badge
-                      className={`mt-2 transition-all transform hover:scale-105 ${getThreatColor(threatLevel)}`}
-                    >
-                      {threatLevel === "safe"
-                        ? "All Systems Secure"
-                        : threatLevel === "warning"
-                          ? "Suspicious Activity"
-                          : "Threat Detected"}
-                    </Badge>
-                  </CardContent>
-                </Card>{" "}
-                <Card className="group bg-black/20 backdrop-blur-lg border-white/10 hover:bg-black/30 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-yellow-500/20">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-400 group-hover:text-white transition-colors">
-                      AI Scans Today
-                    </CardTitle>
-                    <div className="relative">
-                      <Zap className="h-4 w-4 text-yellow-500 group-hover:animate-ping absolute" />
-                      <Zap className="h-4 w-4 text-yellow-500 relative" />
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-white group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-yellow-400 group-hover:to-orange-400 transition-all">
-                      {aiScansToday}
-                    </div>
-                    <p className="text-xs text-gray-400 mt-2 group-hover:text-gray-300 transition-colors">
-                      ML-powered real-time scanning
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="group bg-black/20 backdrop-blur-lg border-white/10 hover:bg-black/30 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-green-500/20">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-400 group-hover:text-white transition-colors">
-                      Blocked Threats
-                    </CardTitle>
-                    <div className="relative">
-                      <CheckCircle className="h-4 w-4 text-green-500 transform group-hover:scale-125 transition-transform" />
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-white group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-green-400 group-hover:to-emerald-400 transition-all">
-                      {blockedThreats}
-                    </div>
-                    <p className="text-xs text-gray-400 mt-2 group-hover:text-gray-300 transition-colors">
-                      Saved{" "}
-                      <span className="text-green-400 group-hover:animate-pulse">
-                        ${savedAmount.toLocaleString()}
-                      </span>{" "}
-                      in potential losses
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>{" "}
-              {/* Send Transaction Section */}{" "}
-              <Card className="group bg-black/20 backdrop-blur-lg border-white/10 hover:bg-black/30 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-green-500/20">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center gap-2">
-                    <span className="transform group-hover:scale-110 transition-transform">
-                      Send Tokens
-                    </span>
-                    <div className="relative h-6 w-6">
-                      <div className="absolute inset-0 bg-green-500 rounded-full opacity-20 group-hover:animate-ping"></div>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        💸
+              {/* Security Operations Dashboard */}
+              <SecurityScore />
+
+              {/* Quick Actions */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Send Tokens */}
+                <Card className="bg-black/20 backdrop-blur-lg border-white/10 hover:border-emerald-500/30 transition-all duration-300">
+                  <CardContent className="p-5">
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
+                        <Shield className="w-5 h-5 text-emerald-400" />
+                      </div>
+                      <div className="flex-1 space-y-3">
+                        <div>
+                          <h3 className="text-base font-semibold text-white">Send Tokens</h3>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Every outgoing transaction is scanned by our ML fraud detection model before your wallet signs.
+                          </p>
+                        </div>
+                        <Button
+                          asChild
+                          className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 w-full rounded-lg h-9 text-sm"
+                        >
+                          <Link to="/send" className="flex items-center justify-center gap-2">
+                            Send Securely
+                            <Zap className="w-3.5 h-3.5" />
+                          </Link>
+                        </Button>
                       </div>
                     </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <Button
-                      asChild
-                      className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white w-full transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-green-500/20 rounded-xl"
-                    >
-                      <Link
-                        to="/send"
-                        className="flex items-center justify-center gap-2 py-3"
-                      >
-                        <span className="text-lg">Send Tokens Securely</span>
-                        <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
-                      </Link>
-                    </Button>
-                    <p className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors leading-relaxed">
-                      Send tokens to any address with ML-powered fraud
-                      detection. Our AI will analyze the transaction and warn
-                      you about potential risks.
-                      <span className="text-cyan-400 font-medium group-hover:animate-pulse">
-                        {" "}
-                        Protected by external ML fraud detection!
-                      </span>
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-              {/* Enhanced Demo Section */}
-              <Card className="group bg-black/20 backdrop-blur-lg border-white/10 hover:bg-black/30 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-red-500/20">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center gap-2">
-                    <span className="transform group-hover:scale-110 transition-transform">
-                      AI Security Demo
-                    </span>
-                    <div className="relative h-6 w-6">
-                      <div className="absolute inset-0 bg-red-500 rounded-full opacity-20 group-hover:animate-ping"></div>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        🚨
+                  </CardContent>
+                </Card>
+
+                {/* AI Demo */}
+                <Card className="bg-black/20 backdrop-blur-lg border-white/10 hover:border-amber-500/30 transition-all duration-300">
+                  <CardContent className="p-5">
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                        <AlertTriangle className="w-5 h-5 text-amber-400" />
+                      </div>
+                      <div className="flex-1 space-y-3">
+                        <div>
+                          <h3 className="text-base font-semibold text-white">AI Threat Demo</h3>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Simulate a scam transaction to see the ML model intercept and analyze it in real time.
+                          </p>
+                        </div>
+                        <Button
+                          onClick={simulateScamTransaction}
+                          disabled={showInterceptor || isProcessing}
+                          className="bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 w-full rounded-lg h-9 text-sm disabled:opacity-40"
+                        >
+                          {isProcessing
+                            ? "Analyzing..."
+                            : showInterceptor
+                              ? "Threat Active"
+                              : "Run Simulation"}
+                        </Button>
                       </div>
                     </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <Button
-                      onClick={simulateScamTransaction}
-                      disabled={showInterceptor || isProcessing}
-                      className="relative bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white w-full transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-red-500/20 disabled:opacity-50 disabled:hover:scale-100 rounded-xl py-3"
-                    >
-                      <div className="absolute inset-0 bg-white/10 rounded-xl animate-pulse"></div>
-                      <span className="relative text-lg">
-                        {isProcessing
-                          ? "Processing..."
-                          : showInterceptor
-                            ? "Threat Active..."
-                            : "🚨 Simulate Scam Transaction"}
-                      </span>
-                    </Button>
-                    <p className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors leading-relaxed">
-                      Test the AI threat detection system with a simulated
-                      malicious transaction. Our AI will analyze the transaction
-                      and warn you about potential risks.
-                      <span className="text-cyan-400 font-medium group-hover:animate-pulse">
-                        {" "}
-                        Earn +3 Shield Points when you block threats!
-                      </span>
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-              {/* Threat Monitor */}
-              <ThreatMonitor threatLevel={threatLevel} />
+                  </CardContent>
+                </Card>
+              </div>
+
               {/* Transaction History */}
               <TransactionHistory />
-              {/* MEV Protection Tester */}
-              <MEVProtectionTester />
             </div>
           )}
           {activeTab === "analytics" && (
@@ -1077,8 +928,6 @@ const Index = () => {
                   </div>
                 </CardContent>
               </Card>
-
-
             </div>
           )}
         </main>
@@ -1102,8 +951,6 @@ const Index = () => {
         actionType={lastAction}
         onComplete={() => setShowAIFeedback(false)}
       />
-
-
     </div>
   );
 };

@@ -29,20 +29,20 @@ This guide covers deploying the Wallet1 Go backend service to [Render](https://r
    - `SCAM_REPORT_CONTRACT`: Your deployed contract address
    - `REPORTER_PRIVATE_KEY`: Private key for blockchain transactions
 
-2. **Select your repository** and Render will automatically detect the `render.yaml` file.
+7. **Select your repository** and Render will automatically detect the `render.yaml` file.
 
-3. **Configure environment variables** for all the secrets:
+8. **Configure environment variables** for all the secrets:
    - `DATABASE_URL`: Your PostgreSQL connection string
    - `JWT_SECRET`: A secure secret for JWT token generation
    - `ETH_RPC_URL`: Your Ethereum RPC endpoint
    - `SCAM_REPORT_CONTRACT`: Your contract address
    - `REPORTER_PRIVATE_KEY`: Your private key for transactions
 
-4. **Deploy** and Render will build and run your Go backend automatically.
+9. **Deploy** and Render will build and run your Go backend automatically.
 
-7. **Click "Apply"** to start the deployment process.
+10. **Click "Apply"** to start the deployment process.
 
-8. **Wait for the deployment to complete**. You can monitor the progress in the Render dashboard.
+11. **Wait for the deployment to complete**. You can monitor the progress in the Render dashboard.
 
 ### Method 2: Manual Deployment
 
@@ -61,6 +61,7 @@ If you prefer to deploy manually:
    - **Health Check Path**: /health
 
 4. **Add environment variables** in the dashboard:
+
    ```
    DATABASE_URL=postgresql://username:password@hostname:port/database
    ML_MODEL_URL=https://ml-fraud-transaction-detection.onrender.com/predict
@@ -92,7 +93,7 @@ Update your frontend's API URL to point to your Render-hosted backend:
 
 ```javascript
 // Example configuration in your frontend
-const API_BASE_URL = 'https://wallet-backend.onrender.com';
+const API_BASE_URL = "https://wallet-backend.onrender.com";
 ```
 
 Make sure your CORS configuration in the backend allows requests from your frontend domain.

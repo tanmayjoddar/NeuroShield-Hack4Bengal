@@ -402,9 +402,7 @@ export const SecurityScore: React.FC<SecurityScoreProps> = () => {
                       className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 space-y-2"
                     >
                       <div className="flex items-center gap-2">
-                        <stat.icon
-                          className={`w-4 h-4 ${stat.color}`}
-                        />
+                        <stat.icon className={`w-4 h-4 ${stat.color}`} />
                         <span className="text-xs text-white/40">
                           {stat.label}
                         </span>
@@ -521,8 +519,8 @@ export const SecurityScore: React.FC<SecurityScoreProps> = () => {
                       </div>
                     )}
                     <p className="text-xs text-white/20 mt-2">
-                      Source: QuadraticVoting contract{" "}
-                      <code>isScammer()</code> on-chain read
+                      Source: QuadraticVoting contract <code>isScammer()</code>{" "}
+                      on-chain read
                     </p>
                   </div>
                 )}
