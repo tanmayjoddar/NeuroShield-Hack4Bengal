@@ -13,6 +13,33 @@ import { NETWORK_INFO, isMonadNetwork } from "./utils";
 import { IMEVProtection, createMEVProtection } from "./mev-protection";
 
 /**
+ * Patch a BrowserProvider to force legacy (type 0) transactions.
+ * Monad testnet does NOT support EIP-1559 (eth_maxPriorityFeePerGas),
+ * so we override getFeeData to return only gasPrice and null out EIP-1559 fields.
+ */
+export function patchProviderForMonad(provider: BrowserProvider): BrowserProvider {
+  const originalGetFeeData = provider.getFeeData.bind(provider);
+  provider.getFeeData = async () => {
+    try {
+      const fee = await originalGetFeeData();
+      return new ethers.FeeData(
+        fee.gasPrice,
+        null,  // maxFeePerGas — disable EIP-1559
+        null   // maxPriorityFeePerGas — disable EIP-1559
+      );
+    } catch {
+      // If even gasPrice fails, use a safe default (50 gwei)
+      return new ethers.FeeData(
+        ethers.parseUnits("50", "gwei"),
+        null,
+        null
+      );
+    }
+  };
+  return provider;
+}
+
+/**
  * Simple functions for basic wallet connection
  * These are exported separately for simpler use in components
  */
@@ -112,7 +139,7 @@ export const connectWallet = async (
  */
 export const getProvider = (): BrowserProvider | null => {
   if (!window.ethereum) return null;
-  return new BrowserProvider(window.ethereum);
+  return patchProviderForMonad(new BrowserProvider(window.ethereum));
 };
 
 /**
@@ -194,7 +221,7 @@ class WalletConnector {
       }
 
       // Get provider, signer and address
-      this.provider = new BrowserProvider(window.ethereum);
+      this.provider = patchProviderForMonad(new BrowserProvider(window.ethereum));
       this.signer = await this.provider.getSigner();
       this.address = accounts[0];
 

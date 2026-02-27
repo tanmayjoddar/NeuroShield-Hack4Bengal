@@ -17,6 +17,7 @@ interface VoteCastEventArgs extends Result {
 // Imports
 import { Contract, formatUnits, parseUnits, ethers } from "ethers";
 import walletConnector from "./wallet";
+import { patchProviderForMonad } from "./wallet";
 import { shortenAddress, isValidAddress } from "./utils";
 import EventEmitter from "events";
 import type { Result } from "ethers";
@@ -162,7 +163,7 @@ class ContractService extends EventEmitter {
           });
           if (accounts && accounts.length > 0) {
             const { BrowserProvider } = await import("ethers");
-            walletConnector.provider = new BrowserProvider(window.ethereum);
+            walletConnector.provider = patchProviderForMonad(new BrowserProvider(window.ethereum));
             walletConnector.signer = await walletConnector.provider.getSigner();
             walletConnector.address = accounts[0];
             const network = await walletConnector.provider.getNetwork();
@@ -531,6 +532,7 @@ class ContractService extends EventEmitter {
       const tx = await walletConnector.signer!.sendTransaction({
         to,
         value: amountWei,
+        type: 0, // Force legacy tx — Monad doesn't support EIP-1559
       });
 
       return tx;
@@ -579,7 +581,12 @@ class ContractService extends EventEmitter {
     if (!shield) {
       throw new Error("SHIELD token not available on this network");
     }
-    return shield.approve(this.QUADRATIC_VOTING_ADDRESS, amount);
+    const feeData = await walletConnector.provider?.getFeeData();
+    return shield.approve(this.QUADRATIC_VOTING_ADDRESS, amount, {
+      type: 0,
+      gasPrice: feeData?.gasPrice,
+      gasLimit: 100000n,
+    });
   }
 
   // Quadratic Voting Functions
@@ -670,7 +677,12 @@ class ContractService extends EventEmitter {
     tokens: string,
   ): Promise<ethers.ContractTransactionResponse> {
     const { voting } = await this.getSignerContract();
-    return voting.castVote(proposalId, support, tokens);
+    const feeData = await walletConnector.provider?.getFeeData();
+    return voting.castVote(proposalId, support, tokens, {
+      type: 0,
+      gasPrice: feeData?.gasPrice,
+      gasLimit: 500000n,
+    });
   }
   public async reportScam(
     suspiciousAddress: string,
@@ -691,7 +703,7 @@ class ContractService extends EventEmitter {
             method: "eth_accounts",
           });
           if (accounts && accounts.length > 0) {
-            walletConnector.provider = new BrowserProvider(window.ethereum);
+            walletConnector.provider = patchProviderForMonad(new BrowserProvider(window.ethereum));
             walletConnector.signer = await walletConnector.provider.getSigner();
             walletConnector.address = accounts[0];
             const network = await walletConnector.provider.getNetwork();
@@ -788,6 +800,7 @@ class ContractService extends EventEmitter {
         {
           gasLimit: (gasEstimate * 120n) / 100n, // Add 20% buffer
           gasPrice: feeData?.gasPrice,
+          type: 0, // Force legacy tx — Monad doesn't support EIP-1559
         },
       );
 

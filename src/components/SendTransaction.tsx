@@ -535,6 +535,7 @@ const SendTransaction: React.FC<SendTransactionProps> = ({
       const tx = {
         to: recipient,
         value: amountInWei,
+        type: 0, // Force legacy tx — Monad doesn't support EIP-1559
         gasPrice: ethers.parseUnits(gasPrice, "gwei"), // Use user input for gas price
         nonce: await signer.provider.getTransactionCount(
           await signer.getAddress(),
