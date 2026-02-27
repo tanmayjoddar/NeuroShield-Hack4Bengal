@@ -39,14 +39,15 @@ func NewAIServiceWithDB(analyticsService *WalletAnalyticsService, db *gorm.DB) *
 }
 
 // AIModelRequest represents the request structure for AI model prediction
+// Features is []interface{} because positions 16 & 17 are strings.
 type AIModelRequest struct {
-	FromAddress           string    `json:"from_address"`
-	ToAddress             string    `json:"to_address"`
-	TransactionValue      float64   `json:"transaction_value"`
-	GasPrice              float64   `json:"gas_price"`
-	IsContractInteraction bool      `json:"is_contract_interaction"`
-	AccHolder             string    `json:"acc_holder"`
-	Features              []float64 `json:"features"`
+	FromAddress           string        `json:"from_address"`
+	ToAddress             string        `json:"to_address"`
+	TransactionValue      float64       `json:"transaction_value"`
+	GasPrice              float64       `json:"gas_price"`
+	IsContractInteraction bool          `json:"is_contract_interaction"`
+	AccHolder             string        `json:"acc_holder"`
+	Features              []interface{} `json:"features"`
 }
 
 // AIModelResponse represents the prediction response from the AI model
@@ -64,29 +65,32 @@ func (s *AIService) AnalyzeTransaction(tx models.Transaction) (float64, error) {
 	// ──────────────────────────────────────────────────
 	// Build the 18-feature vector the deployed model expects.
 	// Feature positions (from the model's training dataset):
-	//  [0]  Avg min between sent tnx
-	//  [1]  Avg min between received tnx
-	//  [2]  Time diff between first and last (mins)
-	//  [3]  Sent tnx count
-	//  [4]  Received tnx count
-	//  [5]  Number of created contracts
-	//  [6]  Max value received (ETH)
-	//  [7]  Avg value received (ETH)
-	//  [8]  Avg value sent (ETH)
-	//  [9]  Total ether sent
-	//  [10] Total ether balance
-	//  [11] ERC20 total ether received
-	//  [12] ERC20 total ether sent to contracts
-	//  [13] Transaction value (current tx)
-	//  [14] Gas price
-	//  [15] ERC20 unique sent addresses
-	//  [16] ERC20 unique received token names
-	//  [17] Wallet age (days)
+	//  [0]  avg_min_between_sent_tnx      (float)
+	//  [1]  avg_min_between_received_tnx  (float)
+	//  [2]  time_diff_mins                (float)
+	//  [3]  sent_tnx                      (float)
+	//  [4]  received_tnx                  (float)
+	//  [5]  number_of_created_contracts   (float)
+	//  [6]  max_value_received            (float)
+	//  [7]  avg_val_received              (float)
+	//  [8]  avg_val_sent                  (float)
+	//  [9]  total_ether_sent              (float)
+	//  [10] total_ether_balance           (float)
+	//  [11] erc20_total_ether_received    (float)
+	//  [12] erc20_total_ether_sent        (float)
+	//  [13] erc20_total_ether_sent_contract (float)
+	//  [14] erc20_uniq_sent_addr          (float)
+	//  [15] erc20_uniq_rec_token_name     (float)
+	//  [16] erc20_most_sent_token_type    (str)
+	//  [17] erc20_most_rec_token_type     (str)
 	// ──────────────────────────────────────────────────
-	features := make([]float64, 18)
-	features[13] = tx.Value
-	gasPrice := 20.0
-	features[14] = gasPrice
+	features := make([]interface{}, 18)
+	for i := 0; i < 16; i++ {
+		features[i] = 0.0
+	}
+	features[16] = "" // erc20_most_sent_token_type (string)
+	features[17] = "" // erc20_most_rec_token_type (string)
+	features[9] = tx.Value // total_ether_sent (current tx as proxy)
 	isContract := false
 
 	// Populate the rest from wallet analytics (DB + RPC data we already collect).
@@ -106,19 +110,21 @@ func (s *AIService) AnalyzeTransaction(tx models.Transaction) (float64, error) {
 			features[9] = weiToEth(wa.TotalEtherSent)
 			features[10] = weiToEth(wa.TotalEtherBalance)
 			features[11] = weiToEth(wa.ERC20TotalEtherReceived)
-			features[12] = weiToEth(wa.ERC20TotalEtherSentContract)
-			features[15] = float64(wa.ERC20UniqSentAddr)
-			features[16] = float64(wa.ERC20UniqRecTokenName)
-			features[17] = float64(wa.WalletAge)
+			features[12] = weiToEth(wa.ERC20TotalEtherSent)
+			features[13] = weiToEth(wa.ERC20TotalEtherSentContract)
+			features[14] = float64(wa.ERC20UniqSentAddr)
+			features[15] = float64(wa.ERC20UniqRecTokenName)
+			features[16] = wa.ERC20MostSentTokenType
+			features[17] = wa.ERC20MostRecTokenType
 		}
-		// If analytics fails we still have [13]+[14] — same as before, no worse.
+		// If analytics fails we still have [9] (tx value) — same as before, no worse.
 	}
 
 	request := AIModelRequest{
 		FromAddress:           tx.FromAddress,
 		ToAddress:             tx.ToAddress,
 		TransactionValue:      tx.Value,
-		GasPrice:              gasPrice,
+		GasPrice:              20.0, // default gas price for metadata
 		IsContractInteraction: isContract,
 		AccHolder:             tx.FromAddress,
 		Features:              features,
