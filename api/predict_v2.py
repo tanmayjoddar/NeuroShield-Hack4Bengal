@@ -8,7 +8,7 @@ EXTERNAL_ML_API = "https://ml-fraud-transaction-detection.onrender.com/predict"
 class TransactionPredictor:
     def __init__(self):
         self.api_url = EXTERNAL_ML_API
-    
+
     def predict(self, transaction_data):
         """
         Predict risk score for a transaction using external ML API
@@ -29,15 +29,15 @@ class TransactionPredictor:
                     "acc_holder": transaction_data.get("acc_holder", transaction_data.get("from_address", "")),
                     "features": transaction_data.get("features", [0.0] * 16 + ["", ""])  # 16 floats + 2 strings
                 }
-            
+
             # Ensure features is correct length
             if len(ml_request["features"]) != 18:
                 ml_request["features"] = [0.0] * 16 + ["", ""]
-                
+
             # Make sure transaction value and gas price are in the features array
             ml_request["features"][0] = float(ml_request.get("transaction_value", 0.0))
             ml_request["features"][1] = float(ml_request.get("gas_price", 20.0))
-              
+
             # Forward the formatted request to the external API
             # Use a longer timeout for the external API (30 seconds)
             # This is because the free tier of Render can be slow to start up
@@ -65,24 +65,24 @@ class TransactionPredictor:
                 except requests.exceptions.Timeout:
                     # Fallback in case of timeout - log the timeout and return a default response
                     print(f"Warning: ML API request timed out after retries")
-                    
+
                     # Create a smart fallback based on transaction data
                     risk_level = "MEDIUM-LOW"
                     risk_score = 0.3
                     explanation = "ML API timed out. Using fallback risk assessment."
-                    
+
                     # If it's a contract interaction, slightly higher risk
                     if ml_request.get("is_contract_interaction", False):
                         risk_score = 0.45
                         risk_level = "MEDIUM"
                         explanation += " Contract interaction detected."
-                    
+
                     # If it's a large transaction, slightly higher risk
                     if ml_request.get("transaction_value", 0) > 10:
                         risk_score = min(0.6, risk_score + 0.15)
                         risk_level = "MEDIUM-HIGH"
                         explanation += " Large transaction value."
-                    
+
                     return {
                         "prediction": "Unknown",
                         "risk_score": risk_score,
@@ -107,18 +107,18 @@ class TransactionPredictor:
                 return {
                     "error": f"ML API Error: {str(e)}",
                     "risk_score": 0.5,
-                    "risk_level": "MEDIUM", 
+                    "risk_level": "MEDIUM",
                     "explanation": "ML service connection error. Using cautious assessment.",
                     "error_type": str(type(e).__name__)
                 }
-            
+
             # If successful, return the API response along with risk score
             if response.status_code == 200:
                 try:
                     api_response = response.json()
                     # Convert the external API response to our risk score format
                     risk_score = api_response.get("risk_score", 0.1)  # Get risk score or use default
-                    
+
                     # Determine risk level based on risk score
                     if risk_score > 0.7:
                         risk_level = "HIGH"
@@ -126,7 +126,7 @@ class TransactionPredictor:
                         risk_level = "MEDIUM"
                     else:
                         risk_level = "LOW"
-                    
+
                     return {
                         "prediction": api_response.get("prediction", 0),
                         "risk_score": risk_score,
@@ -150,7 +150,7 @@ class TransactionPredictor:
                     error_text = response.text
                 except:
                     error_text = "Could not retrieve error details"
-                    
+
                 print(f"ML API error response: {response.status_code}, {error_text}")
                 return {
                     "error": f"API Error: {response.status_code}",
@@ -183,20 +183,20 @@ class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         content_length = int(self.headers['Content-Length'])
         post_data = self.rfile.read(content_length)
-        
+
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
         self.end_headers()
-        
+
         try:
             # Parse transaction data
             tx_data = json.loads(post_data)
-            
+
             # Get prediction from external ML API
             prediction = predictor.predict(tx_data)
-            
+
             # Return prediction
             self.wfile.write(json.dumps(prediction).encode())
         except Exception as e:

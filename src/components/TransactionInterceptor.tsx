@@ -140,24 +140,24 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
           // non-critical — features stay 0
         }
         const features: (number | string)[] = [
-          0,                                          // [0]  avg_min_between_sent_tnx
-          0,                                          // [1]  avg_min_between_received_tnx
-          0,                                          // [2]  time_diff_mins
-          senderNonce,                                // [3]  sent_tnx
-          0,                                          // [4]  received_tnx
-          0,                                          // [5]  number_of_created_contracts
-          0,                                          // [6]  max_value_received
-          0,                                          // [7]  avg_val_received
+          0, // [0]  avg_min_between_sent_tnx
+          0, // [1]  avg_min_between_received_tnx
+          0, // [2]  time_diff_mins
+          senderNonce, // [3]  sent_tnx
+          0, // [4]  received_tnx
+          0, // [5]  number_of_created_contracts
+          0, // [6]  max_value_received
+          0, // [7]  avg_val_received
           senderNonce > 0 ? senderBalance / senderNonce : 0, // [8] avg_val_sent
-          value,                                      // [9]  total_ether_sent
-          senderBalance,                              // [10] total_ether_balance
-          0,                                          // [11] erc20_total_ether_received
-          0,                                          // [12] erc20_total_ether_sent
-          0,                                          // [13] erc20_total_ether_sent_contract
-          0,                                          // [14] erc20_uniq_sent_addr
-          0,                                          // [15] erc20_uniq_rec_token_name
-          "",                                         // [16] erc20_most_sent_token_type
-          "",                                         // [17] erc20_most_rec_token_type
+          value, // [9]  total_ether_sent
+          senderBalance, // [10] total_ether_balance
+          0, // [11] erc20_total_ether_received
+          0, // [12] erc20_total_ether_sent
+          0, // [13] erc20_total_ether_sent_contract
+          0, // [14] erc20_uniq_sent_addr
+          0, // [15] erc20_uniq_rec_token_name
+          "", // [16] erc20_most_sent_token_type
+          "", // [17] erc20_most_rec_token_type
         ];
 
         const transactionData = {
@@ -182,17 +182,14 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
             console.warn("ML API request timed out after 15 seconds");
           }, 15000); // 15 second timeout
 
-          const response = await fetch(
-            "/ml-api/predict",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(transactionData),
-              signal: controller.signal,
+          const response = await fetch("/ml-api/predict", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
             },
-          );
+            body: JSON.stringify(transactionData),
+            signal: controller.signal,
+          });
 
           clearTimeout(timeoutId);
 

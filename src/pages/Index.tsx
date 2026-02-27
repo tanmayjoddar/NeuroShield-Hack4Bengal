@@ -306,13 +306,30 @@ const Index = () => {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between w-full">
             {/* Logo and Title */}
-            <div className="flex items-center space-x-3 group cursor-pointer" onClick={() => setActiveTab("overview")}>
-              <NeuroShieldLogo size={46} className="transition-transform duration-300 group-hover:scale-110" />
+            <div
+              className="flex items-center space-x-3 group cursor-pointer"
+              onClick={() => setActiveTab("overview")}
+            >
+              <NeuroShieldLogo
+                size={46}
+                className="transition-transform duration-300 group-hover:scale-110"
+              />
               <div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white" style={{ fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: '-0.04em' }}>
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500">Neuro</span><span className="text-white">Shield</span>
+                <h1
+                  className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white"
+                  style={{
+                    fontFamily: "'Inter', system-ui, sans-serif",
+                    letterSpacing: "-0.04em",
+                  }}
+                >
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500">
+                    Neuro
+                  </span>
+                  <span className="text-white">Shield</span>
                 </h1>
-                <p className="text-xs sm:text-sm text-gray-400 uppercase tracking-[0.18em] font-medium">Web3 Security Protocol</p>
+                <p className="text-xs sm:text-sm text-gray-400 uppercase tracking-[0.18em] font-medium">
+                  Web3 Security Protocol
+                </p>
               </div>
             </div>
 
@@ -444,12 +461,24 @@ const Index = () => {
                 <button
                   className="group relative inline-flex items-center gap-2.5 px-8 py-3.5 rounded-2xl text-sm font-bold text-white overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-[0_0_30px_rgba(34,211,238,0.3)] active:scale-[0.98]"
                   onClick={() => navigate("/send")}
-                  style={{ background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #8b5cf6 100%)' }}
+                  style={{
+                    background:
+                      "linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #8b5cf6 100%)",
+                  }}
                 >
                   <span className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
                   <span className="relative flex items-center gap-2">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M5 12h14M12 5l7 7-7 7"/>
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M5 12h14M12 5l7 7-7 7" />
                     </svg>
                     Send Tokens
                   </span>
@@ -469,20 +498,28 @@ const Index = () => {
 
             {/* Right side — 3D Y-axis spinning wallet card (front + back) */}
             <div className="flex-1 flex justify-center card-scene">
-              <div className="relative w-72 lg:w-80 card-spinner" style={{ aspectRatio: "4/5" }}>
+              <div
+                className="relative w-72 lg:w-80 card-spinner"
+                style={{ aspectRatio: "4/5" }}
+              >
                 {/* ===== FRONT FACE ===== */}
                 <div className="card-face bg-gradient-to-br from-slate-800/90 to-slate-900/90 rounded-2xl border border-white/10 shadow-2xl backdrop-blur-xl p-6">
                   <div className="flex justify-between items-center mb-5">
                     <Shield className="h-7 w-7 text-cyan-400" />
                     <div className="flex space-x-1.5">
                       {[...Array(3)].map((_, i) => (
-                        <div key={i} className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></div>
+                        <div
+                          key={i}
+                          className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"
+                        ></div>
                       ))}
                     </div>
                   </div>
                   <div className="space-y-3">
                     <div>
-                      <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-0.5">Wallet</div>
+                      <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-0.5">
+                        Wallet
+                      </div>
                       <div className="text-sm text-white font-mono">
                         {currentAddress
                           ? `${currentAddress.slice(0, 6)}...${currentAddress.slice(-4)}`
@@ -490,21 +527,31 @@ const Index = () => {
                       </div>
                     </div>
                     <div>
-                      <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-0.5">Shield Level</div>
-                      <div className="text-sm text-cyan-400 font-semibold">{shieldLevel}</div>
+                      <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-0.5">
+                        Shield Level
+                      </div>
+                      <div className="text-sm text-cyan-400 font-semibold">
+                        {shieldLevel}
+                      </div>
                     </div>
                   </div>
                   <div className="mt-5 grid grid-cols-3 gap-2">
                     <div className="p-2 bg-white/[0.04] rounded-lg text-center border border-white/[0.06]">
-                      <div className="text-sm font-bold text-white">{aiScansToday}</div>
+                      <div className="text-sm font-bold text-white">
+                        {aiScansToday}
+                      </div>
                       <div className="text-[9px] text-gray-500">Scans</div>
                     </div>
                     <div className="p-2 bg-white/[0.04] rounded-lg text-center border border-white/[0.06]">
-                      <div className="text-sm font-bold text-white">{blockedThreats}</div>
+                      <div className="text-sm font-bold text-white">
+                        {blockedThreats}
+                      </div>
                       <div className="text-[9px] text-gray-500">Blocked</div>
                     </div>
                     <div className="p-2 bg-white/[0.04] rounded-lg text-center border border-white/[0.06]">
-                      <div className="text-sm font-bold text-white">{securityScore}</div>
+                      <div className="text-sm font-bold text-white">
+                        {securityScore}
+                      </div>
                       <div className="text-[9px] text-gray-500">Score</div>
                     </div>
                   </div>
@@ -514,22 +561,36 @@ const Index = () => {
                 <div className="card-face-back bg-gradient-to-br from-purple-900/90 to-slate-900/90 rounded-2xl border border-purple-400/20 shadow-2xl backdrop-blur-xl p-6">
                   <div className="flex justify-between items-center mb-5">
                     <Zap className="h-7 w-7 text-purple-400" />
-                    <span className="text-[10px] uppercase tracking-widest text-purple-400 font-semibold">NeuroShield</span>
+                    <span className="text-[10px] uppercase tracking-widest text-purple-400 font-semibold">
+                      NeuroShield
+                    </span>
                   </div>
                   <div className="space-y-4">
                     <div>
-                      <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-0.5">Network</div>
-                      <div className="text-sm text-white font-mono">Monad Testnet</div>
+                      <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-0.5">
+                        Network
+                      </div>
+                      <div className="text-sm text-white font-mono">
+                        Monad Testnet
+                      </div>
                     </div>
                     <div>
-                      <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-0.5">Protection</div>
-                      <div className="text-sm text-purple-300 font-semibold">AI + DAO + SBT</div>
+                      <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-0.5">
+                        Protection
+                      </div>
+                      <div className="text-sm text-purple-300 font-semibold">
+                        AI + DAO + SBT
+                      </div>
                     </div>
                     <div>
-                      <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-0.5">Status</div>
+                      <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-0.5">
+                        Status
+                      </div>
                       <div className="flex items-center gap-1.5">
                         <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
-                        <span className="text-sm text-green-400 font-semibold">Active</span>
+                        <span className="text-sm text-green-400 font-semibold">
+                          Active
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -537,8 +598,12 @@ const Index = () => {
                     <div className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400">
                       NeuroShield
                     </div>
-                    <div className="text-[10px] text-gray-400 mt-1">Hack4Bengal 5.0</div>
-                    <div className="text-[9px] text-gray-500 mt-0.5">Secured by Smart Contracts</div>
+                    <div className="text-[10px] text-gray-400 mt-1">
+                      Hack4Bengal 5.0
+                    </div>
+                    <div className="text-[9px] text-gray-500 mt-0.5">
+                      Secured by Smart Contracts
+                    </div>
                   </div>
                 </div>
 

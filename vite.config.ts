@@ -9,18 +9,18 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 5173,
     proxy: {
-      '/api': {
-        target: 'http://localhost:8080',
+      "/api": {
+        target: "http://localhost:8080",
         changeOrigin: true,
         secure: false,
       },
-      '/ml-api': {
-        target: 'https://ml-fraud-transaction-detection.onrender.com',
+      "/ml-api": {
+        target: "https://ml-fraud-transaction-detection.onrender.com",
         changeOrigin: true,
         secure: true,
-        rewrite: (path) => path.replace(/^\/ml-api/, ''),
+        rewrite: (path) => path.replace(/^\/ml-api/, ""),
       },
-    }
+    },
   },
   plugins: [
     react(),

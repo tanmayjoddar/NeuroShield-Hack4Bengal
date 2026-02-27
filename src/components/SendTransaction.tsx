@@ -268,24 +268,24 @@ const SendTransaction: React.FC<SendTransactionProps> = ({
           ? walletData.balance / walletData.transactionCount
           : 0;
       const features: (number | string)[] = [
-        0,                                  // [0]  avg_min_between_sent_tnx (no history RPC)
-        0,                                  // [1]  avg_min_between_received_tnx
-        0,                                  // [2]  time_diff_mins
-        walletData.transactionCount,        // [3]  sent_tnx (nonce = sent tx count)
-        0,                                  // [4]  received_tnx (not available via RPC)
-        0,                                  // [5]  number_of_created_contracts
-        0,                                  // [6]  max_value_received
-        0,                                  // [7]  avg_val_received
-        avgValSent,                         // [8]  avg_val_sent (balance / nonce)
-        parseFloat(amount),                 // [9]  total_ether_sent (approx: current tx)
-        walletData.balance,                 // [10] total_ether_balance (REAL)
-        0,                                  // [11] erc20_total_ether_received
-        0,                                  // [12] erc20_total_ether_sent
-        0,                                  // [13] erc20_total_ether_sent_contract
-        0,                                  // [14] erc20_uniq_sent_addr
-        0,                                  // [15] erc20_uniq_rec_token_name
-        "",                                 // [16] erc20_most_sent_token_type
-        "",                                 // [17] erc20_most_rec_token_type
+        0, // [0]  avg_min_between_sent_tnx (no history RPC)
+        0, // [1]  avg_min_between_received_tnx
+        0, // [2]  time_diff_mins
+        walletData.transactionCount, // [3]  sent_tnx (nonce = sent tx count)
+        0, // [4]  received_tnx (not available via RPC)
+        0, // [5]  number_of_created_contracts
+        0, // [6]  max_value_received
+        0, // [7]  avg_val_received
+        avgValSent, // [8]  avg_val_sent (balance / nonce)
+        parseFloat(amount), // [9]  total_ether_sent (approx: current tx)
+        walletData.balance, // [10] total_ether_balance (REAL)
+        0, // [11] erc20_total_ether_received
+        0, // [12] erc20_total_ether_sent
+        0, // [13] erc20_total_ether_sent_contract
+        0, // [14] erc20_uniq_sent_addr
+        0, // [15] erc20_uniq_rec_token_name
+        "", // [16] erc20_most_sent_token_type
+        "", // [17] erc20_most_rec_token_type
       ];
       const transactionData = {
         from_address: fromAddress,
@@ -314,17 +314,14 @@ const SendTransaction: React.FC<SendTransactionProps> = ({
           console.warn("ML API request timed out after 20 seconds");
         }, 20000); // 20 second timeout
 
-        const response = await fetch(
-          "/ml-api/predict",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(transactionData),
-            signal: controller.signal,
+        const response = await fetch("/ml-api/predict", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
           },
-        );
+          body: JSON.stringify(transactionData),
+          signal: controller.signal,
+        });
 
         // Clear timeout immediately when response is received
         clearTimeout(timeoutId);

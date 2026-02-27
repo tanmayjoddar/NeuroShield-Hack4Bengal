@@ -74,8 +74,7 @@ interface DualLayerResult {
 // ML API INTEGRATION (Layer 1 - Instant)
 // ════════════════════════════════════════════
 
-const ML_API_URL =
-  "/ml-api/predict";
+const ML_API_URL = "/ml-api/predict";
 const ML_API_TIMEOUT = 10000; // 10 second timeout
 
 /**
@@ -127,10 +126,10 @@ const runMlScamDetection = async (
         ]);
 
         const balEth = parseFloat(ethers.formatEther(balance));
-        features[3] = txCount;          // sent_tnx (nonce)
+        features[3] = txCount; // sent_tnx (nonce)
         features[8] = txCount > 0 ? balEth / txCount : 0; // avg_val_sent
-        features[9] = txValue;          // total_ether_sent (current tx)
-        features[10] = balEth;          // total_ether_balance
+        features[9] = txValue; // total_ether_sent (current tx)
+        features[10] = balEth; // total_ether_balance
       }
     } catch {
       // Non-critical — features stay 0, same as before

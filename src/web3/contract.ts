@@ -163,7 +163,9 @@ class ContractService extends EventEmitter {
           });
           if (accounts && accounts.length > 0) {
             const { BrowserProvider } = await import("ethers");
-            walletConnector.provider = patchProviderForMonad(new BrowserProvider(window.ethereum));
+            walletConnector.provider = patchProviderForMonad(
+              new BrowserProvider(window.ethereum),
+            );
             walletConnector.signer = await walletConnector.provider.getSigner();
             walletConnector.address = accounts[0];
             const network = await walletConnector.provider.getNetwork();
@@ -703,7 +705,9 @@ class ContractService extends EventEmitter {
             method: "eth_accounts",
           });
           if (accounts && accounts.length > 0) {
-            walletConnector.provider = patchProviderForMonad(new BrowserProvider(window.ethereum));
+            walletConnector.provider = patchProviderForMonad(
+              new BrowserProvider(window.ethereum),
+            );
             walletConnector.signer = await walletConnector.provider.getSigner();
             walletConnector.address = accounts[0];
             const network = await walletConnector.provider.getNetwork();

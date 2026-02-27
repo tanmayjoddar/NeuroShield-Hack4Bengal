@@ -8,7 +8,7 @@ EXTERNAL_ML_API = "https://ml-fraud-transaction-detection.onrender.com/predict"
 class TransactionPredictor:
     def __init__(self):
         self.api_url = EXTERNAL_ML_API
-    
+
     def predict(self, transaction_data):
         """
         Predict risk score for a transaction using external ML API
@@ -29,11 +29,11 @@ class TransactionPredictor:
                     "acc_holder": transaction_data.get("acc_holder", transaction_data.get("from_address", "")),
                     "features": transaction_data.get("features", [0.0] * 16 + ["", ""])  # 16 floats + 2 strings
                 }
-            
+
             # Ensure features is correct length
             if len(ml_request["features"]) != 18:
                 ml_request["features"] = [0.0] * 16 + ["", ""]
-                
+
             # Make sure transaction value and gas price are in the features array
             ml_request["features"][13] = float(ml_request.get("transaction_value", 0.0))
             ml_request["features"][14] = float(ml_request.get("gas_price", 20.0))
@@ -57,7 +57,7 @@ class TransactionPredictor:
                     "explanation": "ML API timed out. Using fallback risk assessment.",
                     "timeout": True
                 }
-            
+
             # If successful, return the API response along with risk score
             if response.status_code == 200:
                 api_response = response.json()
@@ -68,7 +68,7 @@ class TransactionPredictor:
                     risk_level = "HIGH"
                 else:
                     risk_level = "LOW"
-                
+
                 return {
                     "external_prediction": api_response,
                     "prediction": api_response.get("prediction", "Unknown"),
@@ -108,20 +108,20 @@ class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         content_length = int(self.headers['Content-Length'])
         post_data = self.rfile.read(content_length)
-        
+
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
         self.end_headers()
-        
+
         try:
             # Parse transaction data
             tx_data = json.loads(post_data)
-            
+
             # Get prediction from external ML API
             prediction = predictor.predict(tx_data)
-            
+
             # Return prediction
             self.wfile.write(json.dumps(prediction).encode())
         except Exception as e:
