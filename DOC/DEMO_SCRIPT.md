@@ -160,7 +160,15 @@ When you send to it during the demo, the dual-layer UI will show the DAO boost.
 
 **TIME:** 2:00 – 3:15 (75 seconds)
 
-**ACTION:** Go to **Overview** tab. Click **"Send Tokens Securely"** to open the Send page.
+**ACTION:** Go to **Overview** tab. **Before clicking Send**, briefly point at the Security Operations panel.
+
+> "Notice something — the Overview tab doesn't repeat the trust score breakdown. That lives on the SBT tab — your permanent on-chain identity. This panel is different. This is your **Security Operations dashboard** — real-time threat level, addresses you've scanned, threats detected, transactions protected, SHIELD token balance. Identity versus operations. SBT tells you **who you are**. This tells you **what you've done**."
+
+[POINT AT the shield icon with threat level: 🟢 Secure / 🟡 Elevated / 🔴 Critical]
+
+> "Right now — Secure. Zero threats detected. Let's change that."
+
+**ACTION:** Click **"Send Tokens Securely"** to open the Send page.
 
 **SAY:**
 
@@ -456,6 +464,12 @@ Prepare for these. Rehearse the answers until they're reflex.
 > "Open DevTools Console right now. Every contract call that produced every number on that screen is logged — function name, return value, contract address. Cross-reference any of them on Monad Explorer. I'll wait."
 
 [PAUSE — look at judges. Don't fill the silence. Let them decide if they want to challenge it. They won't.]
+
+---
+
+**Q9: "The Overview tab and the SBT tab both show security data. What's the difference?"**
+
+> "They serve completely different purposes. The **SBT tab** is your **on-chain identity** — your trust score breakdown: Wallet History, DAO Accuracy, DAO Participation. That score is computed by the WalletVerifier contract and minted into your Soulbound Token. It tells you **who you are** on-chain. The **Overview tab** is your **security operations dashboard** — how many addresses you've scanned, how many threats were detected, how many transactions were protected, your SHIELD token balance, how many scam reports you've filed. It tells you **what you've done**. Identity versus operations. One is permanent reputation. The other is real-time situational awareness."
 
 ---
 
