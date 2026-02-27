@@ -43,6 +43,7 @@ defaultNetwork: "sepolia",  // or "mainnet"
 ```
 
 Update `etherscan` section:
+
 ```ts
 etherscan: {
   apiKey: { sepolia: process.env.ETHERSCAN_API_KEY || "" },
@@ -99,14 +100,14 @@ VITE_WALLET_VERIFIER_ADDRESS=0xNEW_WALLET_VERIFIER_ADDRESS
 
 Replace `https://testnet-rpc.monad.xyz` with your Ethereum RPC URL in these files:
 
-| # | File | Line | What to change |
-|---|------|------|----------------|
-| 1 | `src/web3/civic/sbt.ts` | ~74 | `const MONAD_RPC = "https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY"` |
-| 2 | `src/web3/civic/auth.ts` | ~81 | `const MONAD_RPC = "https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY"` |
-| 3 | `src/components/WalletAnalytics.tsx` | ~21 | `const MONAD_RPC = "https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY"` |
-| 4 | `src/web3/wallet.ts` | ~54 | `rpcUrls: ["https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY"]` |
-| 5 | `src/web3/utils.ts` | ~46 | Update `rpcUrl` in NETWORK_INFO |
-| 6 | `hardhat/hardhat.config.ts` | ~25 | Already done in Step 1 |
+| #   | File                                 | Line | What to change                                                      |
+| --- | ------------------------------------ | ---- | ------------------------------------------------------------------- |
+| 1   | `src/web3/civic/sbt.ts`              | ~74  | `const MONAD_RPC = "https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY"` |
+| 2   | `src/web3/civic/auth.ts`             | ~81  | `const MONAD_RPC = "https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY"` |
+| 3   | `src/components/WalletAnalytics.tsx` | ~21  | `const MONAD_RPC = "https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY"` |
+| 4   | `src/web3/wallet.ts`                 | ~54  | `rpcUrls: ["https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY"]`        |
+| 5   | `src/web3/utils.ts`                  | ~46  | Update `rpcUrl` in NETWORK_INFO                                     |
+| 6   | `hardhat/hardhat.config.ts`          | ~25  | Already done in Step 1                                              |
 
 > **Tip:** Do a global search for `testnet-rpc.monad.xyz` and replace all.
 
@@ -114,12 +115,12 @@ Replace `https://testnet-rpc.monad.xyz` with your Ethereum RPC URL in these file
 
 Replace chain ID `10143` with your target chain ID:
 
-| # | File | What to change |
-|---|------|----------------|
-| 1 | `src/web3/wallet.ts` line ~30 | `const chainId = "0xAA36A7"` (Sepolia=11155111=0xAA36A7, Mainnet=1=0x1) |
-| 2 | `src/web3/contract.ts` line ~66 | Add entry `"11155111": { ... }` in CONTRACT_ADDRESSES |
-| 3 | `src/web3/contract.ts` lines ~731, ~1054, ~1097 | Change `10143` checks to `11155111` |
-| 4 | `src/web3/utils.ts` lines ~37, ~71, ~82, ~238, ~290 | Update all `10143` references |
+| #   | File                                                | What to change                                                          |
+| --- | --------------------------------------------------- | ----------------------------------------------------------------------- |
+| 1   | `src/web3/wallet.ts` line ~30                       | `const chainId = "0xAA36A7"` (Sepolia=11155111=0xAA36A7, Mainnet=1=0x1) |
+| 2   | `src/web3/contract.ts` line ~66                     | Add entry `"11155111": { ... }` in CONTRACT_ADDRESSES                   |
+| 3   | `src/web3/contract.ts` lines ~731, ~1054, ~1097     | Change `10143` checks to `11155111`                                     |
+| 4   | `src/web3/utils.ts` lines ~37, ~71, ~82, ~238, ~290 | Update all `10143` references                                           |
 
 ### Step 7: Update Wallet Connection Chain Details
 
@@ -137,10 +138,12 @@ blockExplorerUrls: ["https://sepolia.etherscan.io"],
 ### Step 8: Update Backend
 
 **Files:**
+
 - `backend/services/event_listener.go` lines ~111, ~116, ~122
 - `backend/services/sbt.go` line ~52
 
 Replace:
+
 ```go
 // OLD
 rpcURL = "https://testnet-rpc.monad.xyz"
@@ -154,6 +157,7 @@ contractAddr = "0xNEW_QUADRATIC_VOTING_ADDRESS"
 ```
 
 Or better — set these env vars:
+
 ```bash
 MONAD_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
 MONAD_WS_URL=wss://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
@@ -201,12 +205,13 @@ npm run dev
 This is the **hard path**. Solana is NOT EVM-compatible. Nothing carries over except the frontend UI and backend ML model. Every smart contract must be rewritten from scratch.
 
 ### What Does NOT Change (Keep As-Is)
-| Component | Why |
-|-----------|-----|
-| React frontend UI (components, pages, styles) | Framework-agnostic |
-| ML fraud detection model (`api/predict.py`) | Chain-agnostic — it analyzes transaction patterns |
-| Backend Go server (API routes, auth, handlers) | Business logic, not chain-specific |
-| UI design, Tailwind CSS | Visual layer |
+
+| Component                                      | Why                                               |
+| ---------------------------------------------- | ------------------------------------------------- |
+| React frontend UI (components, pages, styles)  | Framework-agnostic                                |
+| ML fraud detection model (`api/predict.py`)    | Chain-agnostic — it analyzes transaction patterns |
+| Backend Go server (API routes, auth, handlers) | Business logic, not chain-specific                |
+| UI design, Tailwind CSS                        | Visual layer                                      |
 
 ### What MUST Be Completely Rewritten
 
@@ -214,28 +219,28 @@ This is the **hard path**. Solana is NOT EVM-compatible. Nothing carries over ex
 
 Every Solidity contract becomes a Solana program written in **Rust** using the **Anchor** framework:
 
-| Solidity Contract | Solana Equivalent | Effort |
-|-------------------|-------------------|--------|
-| `QuadraticVoting.sol` | New Anchor program with PDAs for proposals, vote accounts | ~3-5 days |
-| `ShieldToken.sol` (ERC-20) | SPL Token (use `@solana/spl-token`) — almost free, use existing SPL standard | ~1 day |
-| `CivicSBT.sol` (ERC-721, non-transferable) | Metaplex NFT with frozen transfer — OR a custom PDA-based soulbound token | ~2-3 days |
-| `WalletVerifier.sol` | Anchor program reading SOL balance + DAO PDAs | ~2 days |
-| `SocialRecoveryWallet.sol` | Multi-sig PDA program | ~3 days |
-| `CivicGatedWallet.sol` | Anchor program with CPI to WalletVerifier | ~1 day |
+| Solidity Contract                          | Solana Equivalent                                                            | Effort    |
+| ------------------------------------------ | ---------------------------------------------------------------------------- | --------- |
+| `QuadraticVoting.sol`                      | New Anchor program with PDAs for proposals, vote accounts                    | ~3-5 days |
+| `ShieldToken.sol` (ERC-20)                 | SPL Token (use `@solana/spl-token`) — almost free, use existing SPL standard | ~1 day    |
+| `CivicSBT.sol` (ERC-721, non-transferable) | Metaplex NFT with frozen transfer — OR a custom PDA-based soulbound token    | ~2-3 days |
+| `WalletVerifier.sol`                       | Anchor program reading SOL balance + DAO PDAs                                | ~2 days   |
+| `SocialRecoveryWallet.sol`                 | Multi-sig PDA program                                                        | ~3 days   |
+| `CivicGatedWallet.sol`                     | Anchor program with CPI to WalletVerifier                                    | ~1 day    |
 
 **Total rewrite: ~12-15 days of Solana/Rust development.**
 
 #### 2. Frontend Web3 Layer → Complete Replacement
 
-| Current (EVM) | Solana Replacement |
-|---------------|--------------------|
-| `ethers.js` | `@solana/web3.js` + `@coral-xyz/anchor` |
-| MetaMask | **Phantom** wallet (or Solflare) |
-| `window.ethereum` | `window.solana` (Phantom provider) |
-| `new JsonRpcProvider(rpc)` | `new Connection(rpc)` |
-| `contract.functionName()` | `program.methods.functionName().rpc()` |
-| ERC-20 balance | SPL Token `getTokenAccountBalance()` |
-| Chain ID `10143` | Cluster: `devnet` / `mainnet-beta` |
+| Current (EVM)                     | Solana Replacement                      |
+| --------------------------------- | --------------------------------------- |
+| `ethers.js`                       | `@solana/web3.js` + `@coral-xyz/anchor` |
+| MetaMask                          | **Phantom** wallet (or Solflare)        |
+| `window.ethereum`                 | `window.solana` (Phantom provider)      |
+| `new JsonRpcProvider(rpc)`        | `new Connection(rpc)`                   |
+| `contract.functionName()`         | `program.methods.functionName().rpc()`  |
+| ERC-20 balance                    | SPL Token `getTokenAccountBalance()`    |
+| Chain ID `10143`                  | Cluster: `devnet` / `mainnet-beta`      |
 | Addresses: `0x...` (20 bytes hex) | Base58 public keys (e.g., `5yNh...3Kj`) |
 
 **Files to rewrite entirely:**
@@ -257,9 +262,12 @@ npm install @solana/web3.js @coral-xyz/anchor @solana/spl-token @solana/wallet-a
 ```
 
 Replace MetaMask connection with Phantom:
+
 ```ts
 // OLD (EVM)
-const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+const accounts = await window.ethereum.request({
+  method: "eth_requestAccounts",
+});
 
 // NEW (Solana)
 const resp = await window.solana.connect();
@@ -305,7 +313,7 @@ const transaction = new Transaction().add(
     fromPubkey: wallet.publicKey,
     toPubkey: new PublicKey(recipientAddress),
     lamports: amount * LAMPORTS_PER_SOL,
-  })
+  }),
 );
 const signature = await wallet.sendTransaction(transaction, connection);
 ```
@@ -353,17 +361,17 @@ anchor deploy
 
 ## Quick Comparison
 
-| | Ethereum Migration | Solana Migration |
-|-|-------------------|-----------------|
-| **Effort** | ~1-2 hours | ~2-3 weeks |
-| **Contract changes** | Zero (same Solidity) | Complete rewrite in Rust |
-| **Frontend changes** | Config only (RPC, chain ID, addresses) | Full web3 layer rewrite |
-| **Wallet** | Still MetaMask | Switch to Phantom |
-| **Library** | Still ethers.js | @solana/web3.js + Anchor |
-| **Address format** | Same 0x... hex | Base58 public keys |
-| **ABI files** | Same JSON ABIs | IDL files (Anchor-generated) |
-| **Gas model** | Gas price × gas used | Compute units + priority fee |
-| **Token standard** | ERC-20 / ERC-721 | SPL Token / Metaplex NFT |
+|                      | Ethereum Migration                     | Solana Migration             |
+| -------------------- | -------------------------------------- | ---------------------------- |
+| **Effort**           | ~1-2 hours                             | ~2-3 weeks                   |
+| **Contract changes** | Zero (same Solidity)                   | Complete rewrite in Rust     |
+| **Frontend changes** | Config only (RPC, chain ID, addresses) | Full web3 layer rewrite      |
+| **Wallet**           | Still MetaMask                         | Switch to Phantom            |
+| **Library**          | Still ethers.js                        | @solana/web3.js + Anchor     |
+| **Address format**   | Same 0x... hex                         | Base58 public keys           |
+| **ABI files**        | Same JSON ABIs                         | IDL files (Anchor-generated) |
+| **Gas model**        | Gas price × gas used                   | Compute units + priority fee |
+| **Token standard**   | ERC-20 / ERC-721                       | SPL Token / Metaplex NFT     |
 
 ---
 
