@@ -13,7 +13,13 @@ export default defineConfig(({ mode }) => ({
         target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false,
-      }
+      },
+      '/ml-api': {
+        target: 'https://ml-fraud-transaction-detection.onrender.com',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/ml-api/, ''),
+      },
     }
   },
   plugins: [

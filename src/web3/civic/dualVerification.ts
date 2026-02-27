@@ -75,7 +75,7 @@ interface DualLayerResult {
 // ════════════════════════════════════════════
 
 const ML_API_URL =
-  "https://ml-fraud-transaction-detection.onrender.com/predict";
+  "/ml-api/predict";
 const ML_API_TIMEOUT = 10000; // 10 second timeout
 
 /**
@@ -89,12 +89,29 @@ const runMlScamDetection = async (
 ): Promise<MLResult> => {
   try {
     // ── Build the 18-feature payload ──────────────────────
-    // Positions match the model's training dataset columns.
-    const features = new Array(18).fill(0);
+    // Positions match the deployed ML model's training dataset:
+    //  [0]  avg_min_between_sent_tnx      (float)
+    //  [1]  avg_min_between_received_tnx  (float)
+    //  [2]  time_diff_mins                (float)
+    //  [3]  sent_tnx                      (float)
+    //  [4]  received_tnx                  (float)
+    //  [5]  number_of_created_contracts   (float)
+    //  [6]  max_value_received            (float)
+    //  [7]  avg_val_received              (float)
+    //  [8]  avg_val_sent                  (float)
+    //  [9]  total_ether_sent              (float)
+    //  [10] total_ether_balance           (float)
+    //  [11] erc20_total_ether_received    (float)
+    //  [12] erc20_total_ether_sent        (float)
+    //  [13] erc20_total_ether_sent_contract (float)
+    //  [14] erc20_uniq_sent_addr          (float)
+    //  [15] erc20_uniq_rec_token_name     (float)
+    //  [16] erc20_most_sent_token_type    (str)
+    //  [17] erc20_most_rec_token_type     (str)
+    const features: (number | string)[] = new Array(16).fill(0);
+    features.push("", ""); // [16] and [17] are strings
     const txValue = parseFloat(transaction.value) || 0;
     const gasPrice = parseFloat(transaction.gasPrice || "20");
-    features[13] = txValue; // current tx value
-    features[14] = gasPrice; // gas price
 
     // Populate what we can from the connected wallet provider.
     // These are cheap RPC calls (usually cached by MetaMask).
@@ -109,14 +126,11 @@ const runMlScamDetection = async (
           provider.getTransactionCount(transaction.from),
         ]);
 
-        // [3] sent_tnx — nonce is a good proxy for total sent txs
-        features[3] = txCount;
-        // [10] total_ether_balance
-        features[10] = parseFloat(ethers.formatEther(balance));
-        // [8] avg_value_sent — rough estimate: balance / nonce
-        if (txCount > 0) {
-          features[8] = features[10] / txCount;
-        }
+        const balEth = parseFloat(ethers.formatEther(balance));
+        features[3] = txCount;          // sent_tnx (nonce)
+        features[8] = txCount > 0 ? balEth / txCount : 0; // avg_val_sent
+        features[9] = txValue;          // total_ether_sent (current tx)
+        features[10] = balEth;          // total_ether_balance
       }
     } catch {
       // Non-critical — features stay 0, same as before

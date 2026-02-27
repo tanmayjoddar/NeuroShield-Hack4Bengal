@@ -244,6 +244,49 @@ const SendTransaction: React.FC<SendTransactionProps> = ({
       );
 
       // Prepare comprehensive transaction data with REAL blockchain information
+      // Feature positions match the deployed ML model's training dataset:
+      //  [0]  avg_min_between_sent_tnx      (float)
+      //  [1]  avg_min_between_received_tnx  (float)
+      //  [2]  time_diff_mins                (float)
+      //  [3]  sent_tnx                      (float)
+      //  [4]  received_tnx                  (float)
+      //  [5]  number_of_created_contracts   (float)
+      //  [6]  max_value_received            (float)
+      //  [7]  avg_val_received              (float)
+      //  [8]  avg_val_sent                  (float)
+      //  [9]  total_ether_sent              (float)
+      //  [10] total_ether_balance           (float)
+      //  [11] erc20_total_ether_received    (float)
+      //  [12] erc20_total_ether_sent        (float)
+      //  [13] erc20_total_ether_sent_contract (float)
+      //  [14] erc20_uniq_sent_addr          (float)
+      //  [15] erc20_uniq_rec_token_name     (float)
+      //  [16] erc20_most_sent_token_type    (str)
+      //  [17] erc20_most_rec_token_type     (str)
+      const avgValSent =
+        walletData.transactionCount > 0
+          ? walletData.balance / walletData.transactionCount
+          : 0;
+      const features: (number | string)[] = [
+        0,                                  // [0]  avg_min_between_sent_tnx (no history RPC)
+        0,                                  // [1]  avg_min_between_received_tnx
+        0,                                  // [2]  time_diff_mins
+        walletData.transactionCount,        // [3]  sent_tnx (nonce = sent tx count)
+        0,                                  // [4]  received_tnx (not available via RPC)
+        0,                                  // [5]  number_of_created_contracts
+        0,                                  // [6]  max_value_received
+        0,                                  // [7]  avg_val_received
+        avgValSent,                         // [8]  avg_val_sent (balance / nonce)
+        parseFloat(amount),                 // [9]  total_ether_sent (approx: current tx)
+        walletData.balance,                 // [10] total_ether_balance (REAL)
+        0,                                  // [11] erc20_total_ether_received
+        0,                                  // [12] erc20_total_ether_sent
+        0,                                  // [13] erc20_total_ether_sent_contract
+        0,                                  // [14] erc20_uniq_sent_addr
+        0,                                  // [15] erc20_uniq_rec_token_name
+        "",                                 // [16] erc20_most_sent_token_type
+        "",                                 // [17] erc20_most_rec_token_type
+      ];
       const transactionData = {
         from_address: fromAddress,
         to_address: recipient,
@@ -251,26 +294,7 @@ const SendTransaction: React.FC<SendTransactionProps> = ({
         gas_price: parseFloat(gasPrice),
         is_contract_interaction: walletData.isContractInteraction,
         acc_holder: fromAddress,
-        features: [
-          parseFloat(amount), // [0] transaction_value
-          parseFloat(gasPrice), // [1] gas_price
-          walletData.balance, // [2] account_balance (REAL)
-          walletData.transactionCount, // [3] total_transactions (REAL)
-          walletData.isContractInteraction ? 1 : 0, // [4] is_contract (REAL)
-          walletData.isExperienced ? 3 : 1, // [5] experience_level (REAL)
-          walletData.valueToBalanceRatio, // [6] value_to_balance_ratio (REAL)
-          walletData.gasPriceRatio, // [7] gas_price_ratio (REAL)
-          walletData.isHighBalance ? 0.0002 : 0.002, // [8] balance_risk_factor (REAL)
-          walletData.valueToBalanceRatio * 0.6, // [9] adjusted_value_ratio (REAL)
-          walletData.isHighBalance ? 0.00002 : 0.0002, // [10] wealth_indicator (REAL)
-          walletData.networkGasPrice, // [11] network_gas_price (REAL)
-          walletData.networkGasPrice - 0.5, // [12] gas_price_minus_offset (REAL)
-          walletData.networkGasPrice - 1.2, // [13] gas_price_trend (REAL)
-          walletData.isExperienced ? 180 : 30, // [14] activity_score (REAL)
-          walletData.isContractInteraction ? 1 : 0, // [15] contract_flag (REAL)
-          walletData.isContractInteraction ? "CONTRACT" : "EOA", // [16] address_type (REAL)
-          walletData.isHighValue ? "LARGE_TX" : "SMALL_TX", // [17] transaction_type (REAL)
-        ],
+        features,
       };
 
       console.log("Real wallet data prepared:", {
@@ -291,7 +315,7 @@ const SendTransaction: React.FC<SendTransactionProps> = ({
         }, 20000); // 20 second timeout
 
         const response = await fetch(
-          "https://ml-fraud-transaction-detection.onrender.com/predict",
+          "/ml-api/predict",
           {
             method: "POST",
             headers: {

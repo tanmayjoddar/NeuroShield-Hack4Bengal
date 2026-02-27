@@ -111,26 +111,53 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
         const isContract = await isContractAddress(toAddress);
         console.log("Contract address check result:", isContract);
 
-        // Prepare features array with real transaction data
-        const features = [
-          gasPrice, // gas_price
-          value, // transaction_value
-          isAddressWhitelisted ? 1 : 0, // trusted address
-          isContract ? 1 : 0, // is_contract
-          0, // remaining features, could be enhanced with historical data
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
+        // Prepare 18-feature array matching the deployed ML model's schema:
+        //  [0]  avg_min_between_sent_tnx       [1]  avg_min_between_received_tnx
+        //  [2]  time_diff_mins                 [3]  sent_tnx
+        //  [4]  received_tnx                   [5]  number_of_created_contracts
+        //  [6]  max_value_received             [7]  avg_val_received
+        //  [8]  avg_val_sent                   [9]  total_ether_sent
+        //  [10] total_ether_balance            [11] erc20_total_ether_received
+        //  [12] erc20_total_ether_sent         [13] erc20_total_ether_sent_contract
+        //  [14] erc20_uniq_sent_addr           [15] erc20_uniq_rec_token_name
+        //  [16] erc20_most_sent_token_type (str)
+        //  [17] erc20_most_rec_token_type  (str)
+        let senderBalance = 0;
+        let senderNonce = 0;
+        try {
+          const provider = window.ethereum
+            ? new ethers.BrowserProvider(window.ethereum)
+            : null;
+          if (provider && fromAddress) {
+            const [bal, nonce] = await Promise.all([
+              provider.getBalance(fromAddress),
+              provider.getTransactionCount(fromAddress),
+            ]);
+            senderBalance = parseFloat(ethers.formatEther(bal));
+            senderNonce = nonce;
+          }
+        } catch {
+          // non-critical — features stay 0
+        }
+        const features: (number | string)[] = [
+          0,                                          // [0]  avg_min_between_sent_tnx
+          0,                                          // [1]  avg_min_between_received_tnx
+          0,                                          // [2]  time_diff_mins
+          senderNonce,                                // [3]  sent_tnx
+          0,                                          // [4]  received_tnx
+          0,                                          // [5]  number_of_created_contracts
+          0,                                          // [6]  max_value_received
+          0,                                          // [7]  avg_val_received
+          senderNonce > 0 ? senderBalance / senderNonce : 0, // [8] avg_val_sent
+          value,                                      // [9]  total_ether_sent
+          senderBalance,                              // [10] total_ether_balance
+          0,                                          // [11] erc20_total_ether_received
+          0,                                          // [12] erc20_total_ether_sent
+          0,                                          // [13] erc20_total_ether_sent_contract
+          0,                                          // [14] erc20_uniq_sent_addr
+          0,                                          // [15] erc20_uniq_rec_token_name
+          "",                                         // [16] erc20_most_sent_token_type
+          "",                                         // [17] erc20_most_rec_token_type
         ];
 
         const transactionData = {
@@ -156,7 +183,7 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
           }, 15000); // 15 second timeout
 
           const response = await fetch(
-            "https://ml-fraud-transaction-detection.onrender.com/predict",
+            "/ml-api/predict",
             {
               method: "POST",
               headers: {

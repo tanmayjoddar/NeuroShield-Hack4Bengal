@@ -27,12 +27,12 @@ class TransactionPredictor:
                     "gas_price": float(transaction_data.get("gas_price", 20.0)),
                     "is_contract_interaction": bool(transaction_data.get("is_contract_interaction", transaction_data.get("is_contract", False))),
                     "acc_holder": transaction_data.get("acc_holder", transaction_data.get("from_address", "")),
-                    "features": transaction_data.get("features", [0.0] * 18)  # Use provided features or initialize with 18 zeros
+                    "features": transaction_data.get("features", [0.0] * 16 + ["", ""])  # 16 floats + 2 strings
                 }
             
             # Ensure features is correct length
             if len(ml_request["features"]) != 18:
-                ml_request["features"] = [0.0] * 18
+                ml_request["features"] = [0.0] * 16 + ["", ""]
                 
             # Make sure transaction value and gas price are in the features array
             ml_request["features"][13] = float(ml_request.get("transaction_value", 0.0))
