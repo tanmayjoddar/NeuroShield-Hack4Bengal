@@ -3,7 +3,6 @@ package handlers
 import (
 	"Wallet/backend/models"
 	"Wallet/backend/services"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -16,15 +15,13 @@ import (
 type ReportHandler struct {
 	db                *gorm.DB
 	blockchainService *services.BlockchainService
-	telegramService   *services.TelegramService
 }
 
 // NewReportHandler creates a new report handler
-func NewReportHandler(db *gorm.DB, blockchainService *services.BlockchainService, telegramService *services.TelegramService) *ReportHandler {
+func NewReportHandler(db *gorm.DB, blockchainService *services.BlockchainService) *ReportHandler {
 	return &ReportHandler{
 		db:                db,
 		blockchainService: blockchainService,
-		telegramService:   telegramService,
 	}
 }
 
@@ -68,15 +65,6 @@ func (h *ReportHandler) CreateReport(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save report: " + err.Error()})
 		return
 	}
-
-	// Send Telegram notification about the report
-	go func() {
-		err := h.telegramService.NotifyScamReport(report.ReporterAddress, &report)
-		if err != nil {
-			// Log the error but don't fail the request
-			log.Printf("Failed to send Telegram notification for scam report: %v", err)
-		}
-	}()
 
 	c.JSON(http.StatusCreated, gin.H{
 		"id":      report.ID,
@@ -125,9 +113,8 @@ func (h *ReportHandler) CreateCriticalReport(c *gin.Context) {
 					"status": "blockchain_failed",
 					"error":  err.Error(),
 				})
-				// Notify admin of blockchain submission failure
-				h.telegramService.NotifyAdmin(fmt.Sprintf("❌ Critical Report Blockchain Submission Failed\nReport ID: %d\nError: %v",
-					report.ID, err))
+				log.Printf("❌ Critical Report Blockchain Submission Failed - Report ID: %d, Error: %v",
+					report.ID, err)
 				return
 			}
 
@@ -137,15 +124,13 @@ func (h *ReportHandler) CreateCriticalReport(c *gin.Context) {
 				"status":       "blockchain_pending",
 			})
 
-			// Notify admin of successful submission
-			h.telegramService.NotifyAdmin(fmt.Sprintf("🚨 Critical Report Submitted\nReport ID: %d\nTx Hash: %s",
-				report.ID, txHash))
+			log.Printf("🚨 Critical Report Submitted - Report ID: %d, Tx Hash: %s",
+				report.ID, txHash)
 		}()
 	}
 
-	// Notify admin immediately
-	go h.telegramService.NotifyAdmin(fmt.Sprintf("🚨 New Critical Report\nScammer: %s\nAmount: %v\nType: %s",
-		report.ScammerAddress, report.Amount, report.ScamType))
+	log.Printf("🚨 New Critical Report - Scammer: %s, Amount: %v, Type: %s",
+		report.ScammerAddress, report.Amount, report.ScamType)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Critical report submitted",

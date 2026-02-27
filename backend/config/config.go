@@ -16,8 +16,7 @@ type Config struct {
 	MLModelURL    string
 	JWTSecret     string
 	Environment   string
-	TelegramToken string
-	BaseURL       string
+	BaseURL string
 }
 
 // LoadConfig loads configuration from .env file and environment variables
@@ -38,8 +37,7 @@ func LoadConfig() (*Config, error) {
 		MLModelURL:    getEnv("ML_MODEL_URL", "https://ml-fraud-transaction-detection.onrender.com/predict"),
 		JWTSecret:     getEnv("JWT_SECRET", ""),
 		Environment:   getEnv("ENVIRONMENT", "production"),
-		TelegramToken: getEnv("TELEGRAM_TOKEN", ""),
-		BaseURL:       getEnv("BASE_URL", "https://api.unhackablewallet.com"),
+		BaseURL: getEnv("BASE_URL", "https://api.unhackablewallet.com"),
 	}
 
 	// Validate configuration

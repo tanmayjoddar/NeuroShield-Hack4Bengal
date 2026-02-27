@@ -100,7 +100,6 @@ switch ($choice) {
             Write-Host "   JWT_SECRET = [A secure random string]" -ForegroundColor Yellow
             Write-Host "   ML_MODEL_URL = https://ml-fraud-transaction-detection.onrender.com/predict" -ForegroundColor Yellow
             Write-Host "   ENVIRONMENT = production" -ForegroundColor Yellow
-            Write-Host "   TELEGRAM_TOKEN = [Your Telegram bot token]" -ForegroundColor Yellow
             Write-Host "   ETH_RPC_URL = [Your Ethereum RPC URL]" -ForegroundColor Yellow
             Write-Host "   SCAM_REPORT_CONTRACT = [Your deployed contract address]" -ForegroundColor Yellow
             Write-Host "   REPORTER_PRIVATE_KEY = [Your wallet private key]" -ForegroundColor Yellow

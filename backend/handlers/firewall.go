@@ -3,7 +3,6 @@ package handlers
 import (
 	"Wallet/backend/models"
 	"Wallet/backend/services"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -14,17 +13,15 @@ import (
 
 // FirewallHandler handles transaction firewall endpoints
 type FirewallHandler struct {
-	db              *gorm.DB
-	aiService       *services.AIService
-	telegramService *services.TelegramService
+	db        *gorm.DB
+	aiService *services.AIService
 }
 
 // NewFirewallHandler creates a new firewall handler
-func NewFirewallHandler(db *gorm.DB, aiService *services.AIService, telegramService *services.TelegramService) *FirewallHandler {
+func NewFirewallHandler(db *gorm.DB, aiService *services.AIService) *FirewallHandler {
 	return &FirewallHandler{
-		db:              db,
-		aiService:       aiService,
-		telegramService: telegramService,
+		db:        db,
+		aiService: aiService,
 	}
 }
 
@@ -86,14 +83,12 @@ func (h *FirewallHandler) AnalyzeHighValueTransaction(c *gin.Context) {
 	status := "safe"
 	if risk > 0.5 { // Lower threshold for high-value transactions
 		status = "blocked"
-		// Notify admin via Telegram for blocked high-value transactions
-		h.telegramService.NotifyAdmin(fmt.Sprintf("🚨 HIGH VALUE TX BLOCKED\nAmount: %v %s\nTo: %s\nRisk Score: %.2f",
-			tx.Value, tx.Currency, tx.ToAddress, risk))
+		log.Printf("🚨 HIGH VALUE TX BLOCKED - Amount: %v %s, To: %s, Risk Score: %.2f",
+			tx.Value, tx.Currency, tx.ToAddress, risk)
 	} else if risk > 0.2 { // Lower threshold for suspicious flag
 		status = "suspicious"
-		// Notify admin of suspicious high-value transaction
-		h.telegramService.NotifyAdmin(fmt.Sprintf("⚠️ Suspicious High Value TX\nAmount: %v %s\nTo: %s\nRisk Score: %.2f",
-			tx.Value, tx.Currency, tx.ToAddress, risk))
+		log.Printf("⚠️ Suspicious High Value TX - Amount: %v %s, To: %s, Risk Score: %.2f",
+			tx.Value, tx.Currency, tx.ToAddress, risk)
 	}
 
 	// Save transaction with risk score

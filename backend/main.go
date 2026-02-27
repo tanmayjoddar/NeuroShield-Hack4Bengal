@@ -56,20 +56,6 @@ func main() {
 		log.Println("Database schema validation successful")
 	}
 
-	// Initialize Telegram service
-	log.Println("Initializing Telegram bot service...")
-	telegramService := services.NewTelegramService(cfg.TelegramToken, db)
-
-	// Set Telegram webhook URL if in production
-	if cfg.Environment == "production" {
-		webhookURL := cfg.BaseURL + "/telegram/webhook"
-		if err := telegramService.SetWebhook(webhookURL); err != nil {
-			log.Printf("Warning: Failed to set Telegram webhook: %v", err)
-		}
-	} else {
-		log.Println("Telegram webhooks not set in development mode")
-	}
-
 	// Start on-chain event listener (QuadraticVoting → ConfirmedScam sync)
 	log.Println("Starting on-chain event listener...")
 	eventListener, err := services.NewEventListenerService(db)
@@ -83,7 +69,7 @@ func main() {
 
 	// Setup router with services
 	log.Println("Setting up API routes...")
-	r := routes.SetupMainRouter(db, telegramService)
+	r := routes.SetupMainRouter(db)
 
 	// Get port from environment or use default
 	port := os.Getenv("PORT")

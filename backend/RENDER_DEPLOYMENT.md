@@ -25,7 +25,6 @@ This guide covers deploying the Wallet1 Go backend service to [Render](https://r
 6. **Set up your secrets** in the Render dashboard:
    - `DATABASE_URL`: Your PostgreSQL connection string
    - `JWT_SECRET`: A secure secret for JWT token signing
-   - `TELEGRAM_TOKEN`: Your Telegram bot token
    - `ETH_RPC_URL`: Your Ethereum RPC URL (e.g., from Infura or Alchemy)
    - `SCAM_REPORT_CONTRACT`: Your deployed contract address
    - `REPORTER_PRIVATE_KEY`: Private key for blockchain transactions
@@ -35,7 +34,6 @@ This guide covers deploying the Wallet1 Go backend service to [Render](https://r
 3. **Configure environment variables** for all the secrets:
    - `DATABASE_URL`: Your PostgreSQL connection string
    - `JWT_SECRET`: A secure secret for JWT token generation
-   - `TELEGRAM_TOKEN`: Your Telegram bot token
    - `ETH_RPC_URL`: Your Ethereum RPC endpoint
    - `SCAM_REPORT_CONTRACT`: Your contract address
    - `REPORTER_PRIVATE_KEY`: Your private key for transactions
@@ -68,7 +66,6 @@ If you prefer to deploy manually:
    ML_MODEL_URL=https://ml-fraud-transaction-detection.onrender.com/predict
    JWT_SECRET=your-secure-jwt-secret
    ENVIRONMENT=production
-   TELEGRAM_TOKEN=your-telegram-bot-token
    ETH_RPC_URL=your-eth-rpc-url
    SCAM_REPORT_CONTRACT=your-contract-address
    REPORTER_PRIVATE_KEY=your-private-key

@@ -66,7 +66,6 @@ func InitializeDatabase(db *gorm.DB) error {
 		{&models.DAOProposal{}, "dao_proposals"},
 		{&models.DAOVote{}, "dao_votes"},
 		{&models.Recovery{}, "recoveries"},
-		{&models.TelegramMapping{}, "telegram_mappings"},
 		{&models.Config{}, "configs"},
 	}
 
@@ -117,14 +116,6 @@ func seedDevelopmentData(db *gorm.DB) error {
 	}
 
 	log.Println("Seeding development data...")
-
-	// Set up initial admin Telegram chat
-	if err := db.Create(&models.Config{
-		Key:   "telegram_admin_chat",
-		Value: "-1001234567890", // Replace with actual admin chat ID
-	}).Error; err != nil {
-		return err
-	}
 
 	return nil
 }

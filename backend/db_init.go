@@ -24,7 +24,7 @@ func InitializeDatabase(db *gorm.DB) error {
 		&models.DAOVote{},
 		&models.ConfirmedScam{},
 		&models.Recovery{},
-		&models.TelegramMapping{},
+
 	)
 
 	if err != nil {
