@@ -334,7 +334,7 @@ const DAOPanel = ({ onNavigateToReports }: DAOPanelProps) => {
             <TooltipProvider>
               <div className="text-center p-4 rounded-lg bg-white/5 border border-white/10">
                 <div className="text-2xl font-bold text-white flex items-center justify-center gap-2">
-                  {parseFloat(userShield || '0').toLocaleString()} SHIELD
+                  {parseFloat(userShield || "0").toLocaleString()} SHIELD
                   <Tooltip>
                     <TooltipTrigger>
                       <HelpCircle className="h-4 w-4 text-gray-400" />

@@ -140,11 +140,17 @@ class ContractService extends EventEmitter {
       let retries = 0;
       while (retries <= MAX_RETRIES) {
         try {
-          const events = await this.votingContract.queryFilter(filter, from, to);
+          const events = await this.votingContract.queryFilter(
+            filter,
+            from,
+            to,
+          );
           allEvents.push(...(events as ethers.EventLog[]));
           break; // success
         } catch (err: any) {
-          const is429 = err?.message?.includes("429") || err?.message?.includes("limited to 25");
+          const is429 =
+            err?.message?.includes("429") ||
+            err?.message?.includes("limited to 25");
           if (is429 && retries < MAX_RETRIES) {
             retries++;
             await new Promise((r) => setTimeout(r, DELAY_MS * retries * 2));
@@ -937,7 +943,9 @@ class ContractService extends EventEmitter {
             if (!isActive) {
               // Proposal ended — check if voter was on the winning side
               const votesFor = BigInt(proposal?.votesFor ?? proposal?.[4]);
-              const votesAgainst = BigInt(proposal?.votesAgainst ?? proposal?.[5]);
+              const votesAgainst = BigInt(
+                proposal?.votesAgainst ?? proposal?.[5],
+              );
               const passed = votesFor > votesAgainst;
               const voterSupport = vote?.support ?? vote?.[1];
               if (voterSupport === passed) correctVotes++;

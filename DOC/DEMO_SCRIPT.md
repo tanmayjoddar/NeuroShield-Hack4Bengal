@@ -19,12 +19,12 @@ _(Ronin Bridge exploiter — $625 million stolen March 2022. Publicly documented
 
 Every other Web3 security tool is **one trick**:
 
-| Tool | What it does | What it can't do |
-|------|-------------|------------------|
-| Etherscan labels | Static blacklist | Never updates itself |
+| Tool              | What it does      | What it can't do                           |
+| ----------------- | ----------------- | ------------------------------------------ |
+| Etherscan labels  | Static blacklist  | Never updates itself                       |
 | MetaMask Blockaid | Heuristic scanner | No community layer, no on-chain reputation |
-| Chainalysis | Enterprise API | $50k/yr, no DAO, no composability |
-| Scamsniffer | Browser extension | No on-chain identity, no governance |
+| Chainalysis       | Enterprise API    | $50k/yr, no DAO, no composability          |
+| Scamsniffer       | Browser extension | No on-chain identity, no governance        |
 
 **NeuroShield is different in three ways nobody else has combined:**
 
@@ -130,14 +130,14 @@ Every other Web3 security tool is **one trick**:
 
 ## SMART CONTRACT REGISTRY
 
-| Contract | Address | Purpose |
-|----------|---------|---------|
-| WalletVerifier | `0x78d8Ff95a4C4dc864AAD94932A39CcB4AcBDdD30` | On-chain trust score (40/30/30) |
-| CivicSBT | `0xc5A1E1E6324Dff8dE996510C8CBc4AdE0D47ADcB` | Soulbound Token minting & metadata |
-| QuadraticVoting | `0xC9755c1Be2c467c17679CeB5d379eF853641D846` | DAO scam proposals + √(SHIELD) voting |
-| ShieldToken | `0xD1a5dD85366D8957E3f1917c4bFe7BDBA113FE0d` | ERC-20 governance token |
-| CivicGatedWallet | `0xC33c15c33fA18CA7Bc03F4FF5630E9d00727cC34` | High-value tx identity gating |
-| SocialRecoveryWallet | `0x6d51b690b3b10196A07D3Bdc042296825006EfBA` | Guardian-based key recovery |
+| Contract             | Address                                      | Purpose                               |
+| -------------------- | -------------------------------------------- | ------------------------------------- |
+| WalletVerifier       | `0x78d8Ff95a4C4dc864AAD94932A39CcB4AcBDdD30` | On-chain trust score (40/30/30)       |
+| CivicSBT             | `0xc5A1E1E6324Dff8dE996510C8CBc4AdE0D47ADcB` | Soulbound Token minting & metadata    |
+| QuadraticVoting      | `0xC9755c1Be2c467c17679CeB5d379eF853641D846` | DAO scam proposals + √(SHIELD) voting |
+| ShieldToken          | `0xD1a5dD85366D8957E3f1917c4bFe7BDBA113FE0d` | ERC-20 governance token               |
+| CivicGatedWallet     | `0xC33c15c33fA18CA7Bc03F4FF5630E9d00727cC34` | High-value tx identity gating         |
+| SocialRecoveryWallet | `0x6d51b690b3b10196A07D3Bdc042296825006EfBA` | Guardian-based key recovery           |
 
 **Network:** Monad Testnet | **Chain ID:** 10143 | **RPC:** `https://testnet-rpc.monad.xyz`
 
@@ -463,6 +463,7 @@ The DAO boost jumps from `+0%` to `+10%` when you rescan in ACT 6.
 > User reports a scam → Community votes → Smart contract confirms → Event fires → Database updates → AI gets a boost → Next person who tries to send there hits 95%, not 85% → They report it → Flywheel spins again. Faster every iteration."
 
 **SHOW:**
+
 - Before DAO: Layer 1 = 85%, Layer 2 = +0%, Combined = 85.0%
 - After DAO: Layer 1 = 85%, Layer 2 = +10% ⚠️ CONFIRMED SCAM, Combined = 95.0%
 
@@ -627,17 +628,17 @@ If a judge asks "sum this up in one sentence," say:
 
 ## TIMING SUMMARY
 
-| Act | Time | Duration | What Happens |
-|-----|------|----------|--------------|
-| 1 — Hook | 0:00–0:35 | 35s | $5.6B line. Ronin address named. Three promises made. |
-| 2 — SBT | 0:35–2:10 | 95s | Connect wallet. Trust circle. 40/30/30 bars. Base64. DevTools proof. |
-| 3 — AI Scanner | 2:10–3:20 | 70s | Send to Ronin. ML=85%, DAO=+0%. Cancel. Gap planted. |
-| 4 — Report | 3:20–4:15 | 55s | `submitProposal()` live. Real MetaMask tx. False-report objection diffused. |
-| 5 — DAO Vote | 4:15–5:15 | 60s | Quadratic voting. √(SHIELD). SBT callback. Living reputation. |
-| 6 — Flywheel | 5:15–6:15 | 60s | Same address. DAO=+10%. 85→95. **The moment.** |
-| 6.5 — Analytics | Optional | 25s | Threat timeline spike. Network graph with red node. |
-| 7 — Close | 6:15–6:50 | 35s | The immune system line. Silence. |
-| Q&A | 6:50+ | — | One sentence first, expand if wanted. |
+| Act             | Time      | Duration | What Happens                                                                |
+| --------------- | --------- | -------- | --------------------------------------------------------------------------- |
+| 1 — Hook        | 0:00–0:35 | 35s      | $5.6B line. Ronin address named. Three promises made.                       |
+| 2 — SBT         | 0:35–2:10 | 95s      | Connect wallet. Trust circle. 40/30/30 bars. Base64. DevTools proof.        |
+| 3 — AI Scanner  | 2:10–3:20 | 70s      | Send to Ronin. ML=85%, DAO=+0%. Cancel. Gap planted.                        |
+| 4 — Report      | 3:20–4:15 | 55s      | `submitProposal()` live. Real MetaMask tx. False-report objection diffused. |
+| 5 — DAO Vote    | 4:15–5:15 | 60s      | Quadratic voting. √(SHIELD). SBT callback. Living reputation.               |
+| 6 — Flywheel    | 5:15–6:15 | 60s      | Same address. DAO=+10%. 85→95. **The moment.**                              |
+| 6.5 — Analytics | Optional  | 25s      | Threat timeline spike. Network graph with red node.                         |
+| 7 — Close       | 6:15–6:50 | 35s      | The immune system line. Silence.                                            |
+| Q&A             | 6:50+     | —        | One sentence first, expand if wanted.                                       |
 
 **Total: 6:50 demo + Q&A. Never go over 7:00.**
 
@@ -645,15 +646,15 @@ If a judge asks "sum this up in one sentence," say:
 
 ## EMERGENCY FALLBACKS
 
-| What Goes Wrong | What You Do |
-|----------------|-------------|
-| MetaMask doesn't pop up | Open DevTools → run `window.ethereum.request({method:'eth_requestAccounts'})` → "warming up" |
-| ML API slow (Render cold start ~30s) | "Free tier, 30-second cold start. Here's the API response I cached:" → show curl output or screenshot |
-| ML returns 10% instead of 85% | "ML sees small tx as safe — exploit was years ago. But watch Layer 2 — DAO still catches it at 95%. That's the point of two layers." |
-| DAO boost shows +0% in ACT 6 | You skipped `demo-execute.js`. Explain verbally: "Once `executeProposal()` fires, `isScammer` returns true and Layer 2 activates. Let me show the contract code." |
-| Transaction reverts | "Gas edge case on testnet. Let me show you the successful prep-run txs on Monad Explorer." Switch to explorer tab. |
-| SBT trust score shows 0% | Fresh wallet — expected. "Zero because I haven't voted yet. After ACT 5 that bar moves up — watch." |
-| DAO proposal doesn't appear | Check Reports tab for blocked txs. Say: "Backend event listener indexes it — let me show you the `ProposalCreated` event on the explorer directly." |
+| What Goes Wrong                      | What You Do                                                                                                                                                       |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MetaMask doesn't pop up              | Open DevTools → run `window.ethereum.request({method:'eth_requestAccounts'})` → "warming up"                                                                      |
+| ML API slow (Render cold start ~30s) | "Free tier, 30-second cold start. Here's the API response I cached:" → show curl output or screenshot                                                             |
+| ML returns 10% instead of 85%        | "ML sees small tx as safe — exploit was years ago. But watch Layer 2 — DAO still catches it at 95%. That's the point of two layers."                              |
+| DAO boost shows +0% in ACT 6         | You skipped `demo-execute.js`. Explain verbally: "Once `executeProposal()` fires, `isScammer` returns true and Layer 2 activates. Let me show the contract code." |
+| Transaction reverts                  | "Gas edge case on testnet. Let me show you the successful prep-run txs on Monad Explorer." Switch to explorer tab.                                                |
+| SBT trust score shows 0%             | Fresh wallet — expected. "Zero because I haven't voted yet. After ACT 5 that bar moves up — watch."                                                               |
+| DAO proposal doesn't appear          | Check Reports tab for blocked txs. Say: "Backend event listener indexes it — let me show you the `ProposalCreated` event on the explorer directly."               |
 
 ---
 
