@@ -307,45 +307,45 @@ export const SecurityScore: React.FC<SecurityScoreProps> = () => {
 
                 {/* Quick stats summary */}
                 <div className="w-full space-y-3">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-white/50 flex items-center gap-2">
-                      <Eye className="w-3.5 h-3.5" /> Scans
+                  <div className="flex justify-between items-center text-base">
+                    <span className="text-white/50 flex items-center gap-2 font-medium">
+                      <Eye className="w-4 h-4" /> Scans
                     </span>
-                    <span className="text-white/80 font-mono">
+                    <span className="text-white/80 font-mono font-semibold">
                       {totalScans}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-white/50 flex items-center gap-2">
-                      <AlertTriangle className="w-3.5 h-3.5" /> Threats
+                  <div className="flex justify-between items-center text-base">
+                    <span className="text-white/50 flex items-center gap-2 font-medium">
+                      <AlertTriangle className="w-4 h-4" /> Threats
                     </span>
                     <span
-                      className={`font-mono ${threatsDetected > 0 ? "text-red-400" : "text-emerald-400"}`}
+                      className={`font-mono font-semibold ${threatsDetected > 0 ? "text-red-400" : "text-emerald-400"}`}
                     >
                       {threatsDetected}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-white/50 flex items-center gap-2">
-                      <ShieldCheck className="w-3.5 h-3.5" /> Protected Txns
+                  <div className="flex justify-between items-center text-base">
+                    <span className="text-white/50 flex items-center gap-2 font-medium">
+                      <ShieldCheck className="w-4 h-4" /> Protected Txns
                     </span>
-                    <span className="text-white/80 font-mono">
+                    <span className="text-white/80 font-mono font-semibold">
                       {txProtected}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-white/50 flex items-center gap-2">
-                      <Zap className="w-3.5 h-3.5" /> SHIELD
+                  <div className="flex justify-between items-center text-base">
+                    <span className="text-white/50 flex items-center gap-2 font-medium">
+                      <Zap className="w-4 h-4" /> SHIELD
                     </span>
-                    <span className="text-amber-400 font-mono">
+                    <span className="text-amber-400 font-mono font-semibold">
                       {shieldBalance}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-white/50 flex items-center gap-2">
-                      <FileWarning className="w-3.5 h-3.5" /> Reports Filed
+                  <div className="flex justify-between items-center text-base">
+                    <span className="text-white/50 flex items-center gap-2 font-medium">
+                      <FileWarning className="w-4 h-4" /> Reports Filed
                     </span>
-                    <span className="text-white/80 font-mono">
+                    <span className="text-white/80 font-mono font-semibold">
                       {reportsCount}
                     </span>
                   </div>
@@ -380,13 +380,13 @@ export const SecurityScore: React.FC<SecurityScoreProps> = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-medium transition-colors border-b-2 ${
+                className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-base font-semibold transition-colors border-b-2 ${
                   activeTab === tab.id
                     ? "border-white/60 text-white"
                     : "border-transparent text-white/40 hover:text-white/60"
                 }`}
               >
-                <tab.icon className="w-4 h-4" /> {tab.label}
+                <tab.icon className="w-5 h-5" /> {tab.label}
               </button>
             ))}
           </div>
@@ -402,12 +402,12 @@ export const SecurityScore: React.FC<SecurityScoreProps> = () => {
                       className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 space-y-2"
                     >
                       <div className="flex items-center gap-2">
-                        <stat.icon className={`w-4 h-4 ${stat.color}`} />
-                        <span className="text-xs text-white/40">
+                        <stat.icon className={`w-5 h-5 ${stat.color}`} />
+                        <span className="text-sm text-white/50 font-medium">
                           {stat.label}
                         </span>
                       </div>
-                      <div className="text-lg font-semibold text-white font-mono">
+                      <div className="text-2xl font-bold text-white font-mono">
                         {stat.value}
                       </div>
                     </div>
@@ -415,7 +415,7 @@ export const SecurityScore: React.FC<SecurityScoreProps> = () => {
                 </div>
 
                 <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-5">
-                  <h4 className="text-sm font-medium text-white/70 mb-3">
+                  <h4 className="text-base font-semibold text-white/80 mb-3">
                     Security Actions
                   </h4>
                   <div className="space-y-2.5">
@@ -427,7 +427,7 @@ export const SecurityScore: React.FC<SecurityScoreProps> = () => {
                           <ArrowRight className="w-4 h-4 text-white/20 mt-0.5 shrink-0" />
                         )}
                         <span
-                          className={`text-sm ${tip.done ? "text-white/50 line-through" : "text-white/60"}`}
+                          className={`text-base ${tip.done ? "text-white/50 line-through" : "text-white/70"}`}
                         >
                           {tip.text}
                         </span>
@@ -436,10 +436,10 @@ export const SecurityScore: React.FC<SecurityScoreProps> = () => {
                   </div>
                 </div>
 
-                <p className="text-[11px] text-white/20 text-center">
+                <p className="text-sm text-white/30 text-center">
                   Metrics from on-chain reads + local security logs — SHIELD
                   balance via{" "}
-                  <code className="text-white/30">ShieldToken.balanceOf()</code>
+                  <code className="text-white/40">ShieldToken.balanceOf()</code>
                 </p>
               </div>
             )}

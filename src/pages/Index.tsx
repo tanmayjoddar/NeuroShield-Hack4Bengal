@@ -26,6 +26,7 @@ import GuardianManager from "@/components/GuardianManager";
 import { useCivicStore } from "@/stores/civicStore";
 import SimpleCivicAuth from "@/components/civic/SimpleCivicAuth";
 import SoulboundToken from "@/components/SoulboundToken";
+import NeuroShieldLogo from "@/components/NeuroShieldLogo";
 import { reportScam } from "@/web3/contract";
 
 const Index = () => {
@@ -305,19 +306,13 @@ const Index = () => {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between w-full">
             {/* Logo and Title */}
-            <div className="flex items-center space-x-3">
-              <div className="relative">
-                <Shield className="h-8 w-8 text-cyan-400" />
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-              </div>{" "}
+            <div className="flex items-center space-x-3 group cursor-pointer" onClick={() => setActiveTab("overview")}>
+              <NeuroShieldLogo size={46} className="transition-transform duration-300 group-hover:scale-110" />
               <div>
-                <h1 className="text-2xl font-bold text-white">
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400">
-                    Neuro
-                  </span>
-                  Shield
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white" style={{ fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: '-0.04em' }}>
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500">Neuro</span><span className="text-white">Shield</span>
                 </h1>
-                <p className="text-sm text-gray-400">Next-Gen Web3 Security</p>
+                <p className="text-xs sm:text-sm text-gray-400 uppercase tracking-[0.18em] font-medium">Web3 Security Protocol</p>
               </div>
             </div>
 
@@ -445,22 +440,30 @@ const Index = () => {
                 AI-powered smart wallet with real-time threat detection,
                 DAO-driven scam reporting, and on-chain Soulbound identity.
               </p>
-              <div className="flex flex-wrap gap-3 justify-center lg:justify-start pt-1">
-                <Button
-                  className="bg-cyan-500 hover:bg-cyan-600 text-white px-7 py-5 text-sm font-semibold rounded-xl transition-all hover:scale-105 shadow-lg shadow-cyan-500/20"
+              <div className="flex flex-wrap gap-4 justify-center lg:justify-start pt-2">
+                <button
+                  className="group relative inline-flex items-center gap-2.5 px-8 py-3.5 rounded-2xl text-sm font-bold text-white overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-[0_0_30px_rgba(34,211,238,0.3)] active:scale-[0.98]"
                   onClick={() => navigate("/send")}
+                  style={{ background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #8b5cf6 100%)' }}
                 >
-                  <Shield className="w-4 h-4 mr-2" />
-                  Send Tokens
-                </Button>
-                <Button
-                  variant="outline"
-                  className="border-white/15 text-gray-300 hover:bg-white/5 hover:text-white px-7 py-5 text-sm font-semibold rounded-xl transition-all hover:scale-105"
+                  <span className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                  <span className="relative flex items-center gap-2">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                    Send Tokens
+                  </span>
+                </button>
+                <button
+                  className="group relative inline-flex items-center gap-2.5 px-8 py-3.5 rounded-2xl text-sm font-bold text-white/90 border border-white/[0.12] bg-white/[0.04] backdrop-blur-sm overflow-hidden transition-all duration-300 hover:scale-105 hover:border-purple-400/40 hover:text-white hover:shadow-[0_0_25px_rgba(168,85,247,0.2)] active:scale-[0.98]"
                   onClick={simulateScamTransaction}
                 >
-                  <Zap className="w-4 h-4 mr-2" />
-                  Try AI Demo
-                </Button>
+                  <span className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                  <span className="relative flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-purple-400 group-hover:text-purple-300 transition-colors" />
+                    Try AI Demo
+                  </span>
+                </button>
               </div>
             </div>
 
