@@ -28,7 +28,7 @@ const QUADRATIC_VOTING_ABI = [
   // View functions
   "function owner() view returns (address)",
   "function shieldToken() view returns (address)",
-  "function getProposal(uint256 proposalId) view returns (tuple(address reporter, address suspiciousAddress, string description, string evidence, uint256 votesFor, uint256 votesAgainst, bool isActive))",
+  "function getProposal(uint256 proposalId) view returns (address reporter, address suspiciousAddress, string description, string evidence, uint256 votesFor, uint256 votesAgainst, bool isActive)",
   "function getVote(uint256 proposalId, address voter) view returns (tuple(bool hasVoted, bool support, uint256 tokens, uint256 power))",
   "function isScammer(address) view returns (bool)",
   "function scamScore(address) view returns (uint256)",
@@ -108,46 +108,55 @@ class ContractService extends EventEmitter {
     };
   }
 
-  // Forward contract events to EventEmitter
+  // Forward contract events to EventEmitter.
+  // NOTE: ethers.js contract.on() uses polling eth_getLogs under the hood
+  // which hammers Monad's 25 req/sec rate limit. Disabled to avoid 429 floods.
+  // Events are refreshed via manual fetchData() in components instead.
   private setupEventForwarding() {
-    if (!this.votingContract) return;
-
-    this.votingContract.on("ProposalCreated", (...args) => {
-      this.emit("ProposalCreated", ...args);
-    });
-
-    this.votingContract.on("VoteCast", (...args) => {
-      this.emit("VoteCast", ...args);
-    });
-
-    this.votingContract.on("ProposalExecuted", (...args) => {
-      this.emit("ProposalExecuted", ...args);
-    });
+    // Intentionally disabled — Monad testnet rate-limits eth_getLogs polling.
+    // Components call fetchData() on user actions instead.
   }
 
   /**
    * Query events with automatic block-range chunking.
-   * Monad testnet limits eth_getLogs to 1000 blocks per request.
-   * This helper paginates backwards from the latest block in 1000-block chunks.
+   * Monad testnet limits eth_getLogs to a 100-block range per request
+   * AND rate-limits to 25 requests/sec, so we add a delay between chunks.
    */
   private async queryFilterChunked(
     filter: any,
-    maxBlocks = 5000,
+    maxBlocks = 500,
   ): Promise<ethers.EventLog[]> {
     if (!this.votingContract || !walletConnector.provider) return [];
 
-    const CHUNK = 999; // stay under Monad's 1000-block limit
+    const CHUNK = 99; // stay under Monad's 100-block limit
+    const DELAY_MS = 120; // ~8 req/sec, well under 25/sec limit
+    const MAX_RETRIES = 2;
     const latestBlock = await walletConnector.provider.getBlockNumber();
     const startBlock = Math.max(0, latestBlock - maxBlocks);
     const allEvents: ethers.EventLog[] = [];
 
     for (let from = startBlock; from <= latestBlock; from += CHUNK + 1) {
       const to = Math.min(from + CHUNK, latestBlock);
-      try {
-        const events = await this.votingContract.queryFilter(filter, from, to);
-        allEvents.push(...(events as ethers.EventLog[]));
-      } catch (err) {
-        console.warn(`[DAO] queryFilter chunk ${from}-${to} failed:`, err);
+      let retries = 0;
+      while (retries <= MAX_RETRIES) {
+        try {
+          const events = await this.votingContract.queryFilter(filter, from, to);
+          allEvents.push(...(events as ethers.EventLog[]));
+          break; // success
+        } catch (err: any) {
+          const is429 = err?.message?.includes("429") || err?.message?.includes("limited to 25");
+          if (is429 && retries < MAX_RETRIES) {
+            retries++;
+            await new Promise((r) => setTimeout(r, DELAY_MS * retries * 2));
+          } else {
+            console.warn(`[DAO] queryFilter chunk ${from}-${to} failed:`, err);
+            break; // skip chunk
+          }
+        }
+      }
+      // Throttle between chunks to stay under rate limit
+      if (from + CHUNK + 1 <= latestBlock) {
+        await new Promise((r) => setTimeout(r, DELAY_MS));
       }
     }
     return allEvents;
@@ -899,38 +908,47 @@ class ContractService extends EventEmitter {
     if (!this.votingContract) await this.init();
 
     try {
-      // Get all votes cast by the user
-      const voteFilter = this.votingContract?.filters.VoteCast(null, address);
-      const voteEvents = await this.queryFilterChunked(voteFilter);
+      // Use direct contract reads instead of event scanning to avoid
+      // hammering eth_getLogs and hitting Monad's 25 req/sec rate limit.
+      let count;
+      try {
+        count = await this.votingContract?.proposalCount();
+      } catch {
+        return { totalVotes: 0, accuracy: 0 };
+      }
+      const totalProposals = Number(count || 0);
+      if (totalProposals === 0) return { totalVotes: 0, accuracy: 0 };
 
-      // Get all executed proposals
-      const executedFilter = this.votingContract?.filters.ProposalExecuted();
-      const executedEvents = await this.queryFilterChunked(executedFilter);
-
-      // Map proposal outcomes
-      const proposalOutcomes = new Map(
-        executedEvents?.map((event) => {
-          const args = (event as ethers.EventLog)
-            .args as unknown as ProposalExecutedEventArgs;
-          return [args.proposalId.toString(), args.passed];
-        }),
-      );
-
-      // Calculate stats
       let totalVotes = 0;
       let correctVotes = 0;
 
-      voteEvents?.forEach((event) => {
-        const args = (event as ethers.EventLog)
-          .args as unknown as VoteCastEventArgs;
-        const outcome = proposalOutcomes.get(args.proposalId.toString());
+      for (let i = 1; i <= totalProposals; i++) {
+        try {
+          const vote = await this.votingContract?.getVote(i, address);
+          const hasVoted = vote?.hasVoted ?? vote?.[0];
+          if (!hasVoted) continue;
 
-        // Only count votes on executed proposals
-        if (typeof outcome !== "undefined") {
           totalVotes++;
-          if (args.support === outcome) correctVotes++;
+
+          // Check if proposal was executed and whether vote aligned
+          try {
+            const proposal = await this.votingContract?.getProposal(i);
+            const isActive = proposal?.isActive ?? proposal?.[6];
+            if (!isActive) {
+              // Proposal ended — check if voter was on the winning side
+              const votesFor = BigInt(proposal?.votesFor ?? proposal?.[4]);
+              const votesAgainst = BigInt(proposal?.votesAgainst ?? proposal?.[5]);
+              const passed = votesFor > votesAgainst;
+              const voterSupport = vote?.support ?? vote?.[1];
+              if (voterSupport === passed) correctVotes++;
+            }
+          } catch {
+            // Can't decode proposal — skip accuracy calc for this one
+          }
+        } catch {
+          // getVote failed — skip
         }
-      });
+      }
 
       return {
         totalVotes,

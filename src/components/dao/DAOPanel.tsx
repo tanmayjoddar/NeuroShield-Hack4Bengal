@@ -31,7 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 import { type ToastActionElement } from "@/components/ui/toast";
 import contractService from "@/web3/contract";
 import walletConnector from "@/web3/wallet";
-import { formatEth, shortenAddress } from "@/web3/utils";
+import { shortenAddress } from "@/web3/utils";
 
 interface ScamReport {
   id: number;
@@ -155,14 +155,16 @@ const DAOPanel = ({ onNavigateToReports }: DAOPanelProps) => {
 
     const handleNewVote = () => fetchData();
 
-    // Register listeners
-    walletConnector.provider?.on("accountsChanged", handleAccountChange);
+    // Register listeners — accountsChanged is an EIP-1193 event on
+    // window.ethereum, NOT an ethers ProviderEvent.
+    const eth = (window as any).ethereum;
+    eth?.on("accountsChanged", handleAccountChange);
     contractService.on("ProposalCreated", handleNewProposal);
     contractService.on("VoteCast", handleNewVote);
 
     // Cleanup on unmount
     return () => {
-      walletConnector.provider?.off("accountsChanged", handleAccountChange);
+      eth?.removeListener("accountsChanged", handleAccountChange);
       contractService.off("ProposalCreated", handleNewProposal);
       contractService.off("VoteCast", handleNewVote);
     };
@@ -210,7 +212,7 @@ const DAOPanel = ({ onNavigateToReports }: DAOPanelProps) => {
       await tx.wait();
 
       // Calculate voting power for toast message
-      const votingPower = Math.sqrt(Number(formatEth(tokens)));
+      const votingPower = Math.sqrt(Number(tokens));
 
       toast({
         title: "🗳️ Vote Submitted",
@@ -332,7 +334,7 @@ const DAOPanel = ({ onNavigateToReports }: DAOPanelProps) => {
             <TooltipProvider>
               <div className="text-center p-4 rounded-lg bg-white/5 border border-white/10">
                 <div className="text-2xl font-bold text-white flex items-center justify-center gap-2">
-                  {formatEth(userShield)} SHIELD
+                  {parseFloat(userShield || '0').toLocaleString()} SHIELD
                   <Tooltip>
                     <TooltipTrigger>
                       <HelpCircle className="h-4 w-4 text-gray-400" />
@@ -452,13 +454,13 @@ const DAOPanel = ({ onNavigateToReports }: DAOPanelProps) => {
                     <div className="flex items-center space-x-2">
                       <ThumbsUp className="h-4 w-4 text-green-500" />
                       <span className="text-white">
-                        {formatEth(proposal.votesFor)} Power
+                        {Number(proposal.votesFor).toLocaleString()} Power
                       </span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <ThumbsDown className="h-4 w-4 text-red-500" />
                       <span className="text-white">
-                        {formatEth(proposal.votesAgainst)} Power
+                        {Number(proposal.votesAgainst).toLocaleString()} Power
                       </span>
                     </div>
                   </div>

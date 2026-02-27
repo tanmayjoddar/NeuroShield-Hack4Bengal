@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Vote, Calculator } from 'lucide-react';
-import { formatEth } from '@/web3/utils';
 
 interface QuadraticVoteInputProps {
   proposalId: number;
@@ -38,9 +37,11 @@ const QuadraticVoteInput: React.FC<QuadraticVoteInputProps> = ({
   }, [tokens]);
   
   // Format helper to display readable numbers
+  // maxTokens arrives as a formatted ETH string (e.g. "999800.0"), NOT wei
   const formatNumber = (num: string) => {
     try {
-      return formatEth(num);
+      const n = parseFloat(num);
+      return isNaN(n) ? '0' : n.toLocaleString();
     } catch {
       return '0';
     }
