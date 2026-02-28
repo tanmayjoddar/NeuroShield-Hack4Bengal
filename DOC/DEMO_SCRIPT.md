@@ -1,7 +1,7 @@
-# NeuroShield — Hack4Bengal Demo Script
+# NeuroShield — Diversion Demo Script
 
 **Total Time: 7 minutes**
-**Hackathon: Hack4Bengal**
+**Hackathon: Diversion**
 **One Address. One Story. Every Layer Fires.**
 
 **THE ADDRESS:** `0x098B716B8Aaf21512996dC57EB0615e2383E2f96`

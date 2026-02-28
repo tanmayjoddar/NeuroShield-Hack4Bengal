@@ -725,4 +725,4 @@ Users link their Telegram to their wallet via `/link`. All security alerts for t
 
 ---
 
-_Built for Hack4Bengal — on Monad testnet._
+_Built for Diversion — on Monad testnet._

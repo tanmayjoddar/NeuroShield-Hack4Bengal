@@ -599,7 +599,7 @@ const Index = () => {
                       NeuroShield
                     </div>
                     <div className="text-[10px] text-gray-400 mt-1">
-                      Hack4Bengal 5.0
+                      Diversion 5.0
                     </div>
                     <div className="text-[9px] text-gray-500 mt-0.5">
                       Secured by Smart Contracts

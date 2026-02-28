@@ -112,8 +112,8 @@ Visualize your on-chain footprint — transaction patterns, token flows, spendin
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/tanmayjoddar/NeuroShield-Hack4Bengal.git
-cd NeuroShield-Hack4Bengal
+git clone https://github.com/tanmayjoddar/NeuroShield-Diversion.git
+cd NeuroShield-Diversion
 ```
 
 ### 2. Start the Frontend
@@ -181,7 +181,7 @@ python index.py
 ## 📁 Project Structure
 
 ```
-NeuroShield-Hack4Bengal/
+NeuroShield-Diversion/
 ├── src/                    # React frontend
 │   ├── components/         # UI components (SBT, DAO, Wallet, etc.)
 │   ├── pages/              # Route pages (Index, SBT, CivicAuth)
