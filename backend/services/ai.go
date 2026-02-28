@@ -96,8 +96,9 @@ func (s *AIService) AnalyzeTransaction(tx models.Transaction) (float64, error) {
 	// Populate the rest from wallet analytics (DB + RPC data we already collect).
 	// This is NOT adding ML code — it's filling the request with real data
 	// instead of sending 16 zeros to the deployed model.
+	// Analyze the RECIPIENT's wallet — that's who we're evaluating for fraud.
 	if s.analyticsService != nil {
-		if wa, err := s.analyticsService.GetWalletAnalytics(tx.FromAddress); err == nil && wa != nil {
+		if wa, err := s.analyticsService.GetWalletAnalytics(tx.ToAddress); err == nil && wa != nil {
 			features[0] = wa.AvgMinBetweenSentTx
 			features[1] = wa.AvgMinBetweenReceivedTx
 			features[2] = wa.TimeDiffFirstLastMins
@@ -126,7 +127,7 @@ func (s *AIService) AnalyzeTransaction(tx models.Transaction) (float64, error) {
 		TransactionValue:      tx.Value,
 		GasPrice:              20.0, // default gas price for metadata
 		IsContractInteraction: isContract,
-		AccHolder:             tx.FromAddress,
+		AccHolder:             tx.ToAddress, // Evaluate the RECIPIENT address
 		Features:              features,
 	}
 

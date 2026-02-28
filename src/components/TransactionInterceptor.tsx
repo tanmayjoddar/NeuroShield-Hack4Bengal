@@ -14,6 +14,7 @@ import {
 import { ethers } from "ethers";
 import walletConnector from "@/web3/wallet";
 import contractService from "@/web3/contract";
+import { buildWalletFeatures } from "@/services/walletFeatures";
 
 interface TransactionInterceptorProps {
   onClose: () => void;
@@ -113,7 +114,8 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
   } | null>(null);
 
   const normalizedToAddress = (toAddress || "").toLowerCase();
-  const isAddressWhitelisted = whitelistedAddresses.includes(normalizedToAddress);
+  const isAddressWhitelisted =
+    whitelistedAddresses.includes(normalizedToAddress);
 
   const analysisRunRef = useRef(0);
   const activeAbortControllerRef = useRef<AbortController | null>(null);
@@ -162,18 +164,31 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
         if (provider) {
           try {
             const results = await Promise.allSettled([
-              fromAddress ? provider.getBalance(fromAddress) : Promise.resolve(0n),
-              fromAddress ? provider.getTransactionCount(fromAddress) : Promise.resolve(0),
+              fromAddress
+                ? provider.getBalance(fromAddress)
+                : Promise.resolve(0n),
+              fromAddress
+                ? provider.getTransactionCount(fromAddress)
+                : Promise.resolve(0),
               provider.getBalance(toAddress),
               provider.getTransactionCount(toAddress),
               provider.getCode(toAddress),
             ]);
 
-            if (results[0].status === "fulfilled") senderBalance = parseFloat(ethers.formatEther(results[0].value as bigint));
-            if (results[1].status === "fulfilled") senderNonce = results[1].value as number;
-            if (results[2].status === "fulfilled") recipientBalance = parseFloat(ethers.formatEther(results[2].value as bigint));
-            if (results[3].status === "fulfilled") recipientNonce = results[3].value as number;
-            if (results[4].status === "fulfilled") isContract = (results[4].value as string) !== "0x";
+            if (results[0].status === "fulfilled")
+              senderBalance = parseFloat(
+                ethers.formatEther(results[0].value as bigint),
+              );
+            if (results[1].status === "fulfilled")
+              senderNonce = results[1].value as number;
+            if (results[2].status === "fulfilled")
+              recipientBalance = parseFloat(
+                ethers.formatEther(results[2].value as bigint),
+              );
+            if (results[3].status === "fulfilled")
+              recipientNonce = results[3].value as number;
+            if (results[4].status === "fulfilled")
+              isContract = (results[4].value as string) !== "0x";
           } catch {
             // non-critical — features stay at defaults
           }
@@ -181,35 +196,37 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
 
         // Store recipient on-chain context for UI display and scoring
         if (analysisRunRef.current === runId) {
-          setRecipientContext({ balance: recipientBalance, nonce: recipientNonce, isContract });
+          setRecipientContext({
+            balance: recipientBalance,
+            nonce: recipientNonce,
+            isContract,
+          });
         }
 
         console.log("On-chain context:", {
           sender: { balance: senderBalance, nonce: senderNonce },
-          recipient: { balance: recipientBalance, nonce: recipientNonce, isContract },
+          recipient: {
+            balance: recipientBalance,
+            nonce: recipientNonce,
+            isContract,
+          },
         });
 
-        // Prepare 18-feature array matching the deployed ML model's schema
-        const features: (number | string)[] = [
-          0, // [0]  avg_min_between_sent_tnx
-          0, // [1]  avg_min_between_received_tnx
-          0, // [2]  time_diff_mins
-          senderNonce, // [3]  sent_tnx
-          recipientNonce, // [4]  received_tnx — use recipient nonce as proxy
-          0, // [5]  number_of_created_contracts
-          recipientBalance, // [6]  max_value_received — use recipient balance as proxy
-          recipientNonce > 0 ? recipientBalance / recipientNonce : 0, // [7] avg_val_received
-          senderNonce > 0 ? senderBalance / senderNonce : 0, // [8] avg_val_sent
-          value, // [9]  total_ether_sent
-          senderBalance, // [10] total_ether_balance
-          0, // [11] erc20_total_ether_received
-          0, // [12] erc20_total_ether_sent
-          0, // [13] erc20_total_ether_sent_contract
-          0, // [14] erc20_uniq_sent_addr
-          0, // [15] erc20_uniq_rec_token_name
-          "", // [16] erc20_most_sent_token_type
-          "", // [17] erc20_most_rec_token_type
-        ];
+        // Build 18-feature array from REAL blockchain data (Etherscan + RPC)
+        // The external ML API requires all 18 features populated with real data.
+        // Sending all zeros causes 99.9% false-positive Fraud classifications.
+        const { features, source: featureSource } = await buildWalletFeatures(
+          toAddress, // acc_holder = recipient (the address we're evaluating)
+          provider,
+          {
+            senderBalance,
+            senderNonce,
+            recipientBalance,
+            recipientNonce,
+            txValue: value,
+          },
+        );
+        console.log(`Features built from ${featureSource}:`, features);
 
         const transactionData = {
           from_address: fromAddress,
@@ -217,7 +234,7 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
           transaction_value: value,
           gas_price: gasPrice,
           is_contract_interaction: isContract,
-          acc_holder: fromAddress,
+          acc_holder: toAddress, // Evaluate the RECIPIENT address
           features,
           // Extra on-chain context for downstream processing
           recipient_balance: recipientBalance,
@@ -573,12 +590,14 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
   // Uses on-chain evidence to prevent false positives
   // ══════════════════════════════════════════
 
-  // Determine if the recipient is a "new/empty" wallet (no tx history, no balance)
+  // Determine if the recipient is a "new/low-history" wallet.
+  // Key signal: nonce === 0 means zero outgoing transactions — the ML model has
+  // no behavioral data to work with, so its "Fraud" prediction is unreliable.
+  // A small balance from a previous inbound transfer doesn't change this.
   const isNewEmptyWallet =
     recipientContext != null &&
     !recipientContext.isContract &&
-    recipientContext.nonce === 0 &&
-    recipientContext.balance === 0;
+    recipientContext.nonce === 0;
 
   // ML base score (0-100) — derived from ML API prediction
   // If ML says Fraud but the address is just new/empty with ZERO DAO evidence,
@@ -593,10 +612,14 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
 
   // On-chain false-positive mitigation:
   // A new empty wallet with 0 DAO reports is *unverified*, not *confirmed fraud*
-  const daoHasEvidence = daoData && (daoData.isScammer || daoData.scamScore > 0 || daoData.activeProposals > 0);
+  const daoHasEvidence =
+    daoData &&
+    (daoData.isScammer || daoData.scamScore > 0 || daoData.activeProposals > 0);
   if (mlScore >= 85 && isNewEmptyWallet && !daoHasEvidence) {
     mlScore = 45; // Downgrade to Medium — insufficient on-chain evidence for High
-    console.log("[Scoring] ML false-positive override: new empty wallet with no DAO reports → capped at 45");
+    console.log(
+      "[Scoring] ML false-positive override: new empty wallet with no DAO reports → capped at 45",
+    );
   }
 
   // Compute combined score incorporating DAO community data
@@ -630,7 +653,9 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
 
   // UI + logging should be consistent and respect whitelist.
   // If recipient is trusted, we still show the raw ML output, but we do not block or label it as high risk.
-  const effectiveRiskScore = isAddressWhitelisted ? Math.min(riskScore, 10) : riskScore;
+  const effectiveRiskScore = isAddressWhitelisted
+    ? Math.min(riskScore, 10)
+    : riskScore;
   const effectiveRiskLevel = isAddressWhitelisted ? "Low" : riskLevel;
   const effectiveIsSuccess = isAddressWhitelisted
     ? true
@@ -743,7 +768,9 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-lg font-bold text-cyan-400">{mlScore}%</div>
+                <div className="text-lg font-bold text-cyan-400">
+                  {mlScore}%
+                </div>
                 <div className="text-[11px] text-gray-500">
                   {mlDurationMs != null ? `ML ${mlDurationMs}ms` : ""}
                   {mlDurationMs != null && daoDurationMs != null ? " • " : ""}
@@ -867,7 +894,6 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
               </div>
             </div>
           </div>
-
           {/* On-chain evidence panel */}
           {recipientContext && (
             <div className="space-y-3">
@@ -878,33 +904,42 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
               <div className="bg-white/5 rounded-lg p-4 border border-white/10">
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
-                    <div className="text-xs text-gray-400">Recipient Balance</div>
-                    <div className="text-white font-medium mt-1">{recipientContext.balance.toFixed(6)} ETH</div>
+                    <div className="text-xs text-gray-400">
+                      Recipient Balance
+                    </div>
+                    <div className="text-white font-medium mt-1">
+                      {recipientContext.balance.toFixed(6)} ETH
+                    </div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-400">Recipient Txns</div>
-                    <div className="text-white font-medium mt-1">{recipientContext.nonce}</div>
+                    <div className="text-white font-medium mt-1">
+                      {recipientContext.nonce}
+                    </div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-400">Type</div>
-                    <div className="text-white font-medium mt-1">{recipientContext.isContract ? "📄 Contract" : "👤 EOA"}</div>
+                    <div className="text-white font-medium mt-1">
+                      {recipientContext.isContract ? "📄 Contract" : "👤 EOA"}
+                    </div>
                   </div>
                 </div>
                 {isNewEmptyWallet && !daoHasEvidence && (
                   <div className="mt-3 text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded p-2">
-                    ⚠️ This is a new wallet with no transaction history and no DAO reports.
-                    ML risk was adjusted downward because there is no on-chain evidence of fraud.
+                    ⚠️ This is a new wallet with no transaction history and no
+                    DAO reports. ML risk was adjusted downward because there is
+                    no on-chain evidence of fraud.
                   </div>
                 )}
                 {daoData?.isScammer && (
                   <div className="mt-3 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded p-2">
-                    🚨 This address has been confirmed as a scam by DAO community vote (on-chain).
+                    🚨 This address has been confirmed as a scam by DAO
+                    community vote (on-chain).
                   </div>
                 )}
               </div>
             </div>
           )}
-
           {/* External ML raw output (debug) */}
           <details className="bg-white/5 rounded-lg p-4 border border-white/10">
             <summary className="text-sm text-gray-300 cursor-pointer select-none">
@@ -912,7 +947,9 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
               {mlDurationMs != null ? ` — ${mlDurationMs}ms` : ""}
             </summary>
             <pre className="mt-3 text-xs text-gray-200 overflow-x-auto whitespace-pre-wrap break-words">
-              {mlRawResponse ? JSON.stringify(mlRawResponse, null, 2) : "No ML response captured."}
+              {mlRawResponse
+                ? JSON.stringify(mlRawResponse, null, 2)
+                : "No ML response captured."}
             </pre>
           </details>
           {/* Transaction Details */}
@@ -1017,25 +1054,27 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
               >
                 {effectiveIsSuccess ? "✅ Proceed to MetaMask" : "Sign Anyway"}
               </Button>
-              {!effectiveIsSuccess && !isAddressWhitelisted && effectiveRiskLevel === "High" && (
-                <Button
-                  onClick={() => {
-                    logTransactionAttempt(
-                      { fromAddress, toAddress, value, gasPrice },
-                      {
-                        score: effectiveRiskScore,
-                        level: effectiveRiskLevel,
-                        blocked: true,
-                        whitelisted: false,
-                      },
-                    );
-                    onBlock();
-                  }}
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                >
-                  🛑 Block Transaction
-                </Button>
-              )}
+              {!effectiveIsSuccess &&
+                !isAddressWhitelisted &&
+                effectiveRiskLevel === "High" && (
+                  <Button
+                    onClick={() => {
+                      logTransactionAttempt(
+                        { fromAddress, toAddress, value, gasPrice },
+                        {
+                          score: effectiveRiskScore,
+                          level: effectiveRiskLevel,
+                          blocked: true,
+                          whitelisted: false,
+                        },
+                      );
+                      onBlock();
+                    }}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    🛑 Block Transaction
+                  </Button>
+                )}
               {effectiveIsSuccess && (
                 <Button
                   onClick={() => {

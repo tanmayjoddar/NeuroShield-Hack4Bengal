@@ -20,6 +20,7 @@ import { verifyCivicIdentity, calculateTrustScore } from "./auth";
 import { ethers } from "ethers";
 import walletConnector from "../wallet";
 import contractService from "../contract";
+import { buildWalletFeatures } from "@/services/walletFeatures";
 
 // ════════════════════════════════════════════
 // TYPES
@@ -80,60 +81,45 @@ const ML_API_TIMEOUT = 10000; // 10 second timeout
 /**
  * Run ML-based scam detection on a transaction.
  * Calls the deployed Render ML API — we own zero ML code.
- * We populate the 18-feature array with whatever on-chain data
- * the connected wallet provider can give us (balance, nonce, etc).
+ * Uses buildWalletFeatures() to populate real on-chain data from Etherscan / RPC.
  */
 const runMlScamDetection = async (
   transaction: TransactionData,
 ): Promise<MLResult> => {
   try {
-    // ── Build the 18-feature payload ──────────────────────
-    // Positions match the deployed ML model's training dataset:
-    //  [0]  avg_min_between_sent_tnx      (float)
-    //  [1]  avg_min_between_received_tnx  (float)
-    //  [2]  time_diff_mins                (float)
-    //  [3]  sent_tnx                      (float)
-    //  [4]  received_tnx                  (float)
-    //  [5]  number_of_created_contracts   (float)
-    //  [6]  max_value_received            (float)
-    //  [7]  avg_val_received              (float)
-    //  [8]  avg_val_sent                  (float)
-    //  [9]  total_ether_sent              (float)
-    //  [10] total_ether_balance           (float)
-    //  [11] erc20_total_ether_received    (float)
-    //  [12] erc20_total_ether_sent        (float)
-    //  [13] erc20_total_ether_sent_contract (float)
-    //  [14] erc20_uniq_sent_addr          (float)
-    //  [15] erc20_uniq_rec_token_name     (float)
-    //  [16] erc20_most_sent_token_type    (str)
-    //  [17] erc20_most_rec_token_type     (str)
-    const features: (number | string)[] = new Array(16).fill(0);
-    features.push("", ""); // [16] and [17] are strings
     const txValue = parseFloat(transaction.value) || 0;
     const gasPrice = parseFloat(transaction.gasPrice || "20");
 
-    // Populate what we can from the connected wallet provider.
-    // These are cheap RPC calls (usually cached by MetaMask).
-    try {
-      const provider = window.ethereum
-        ? new ethers.BrowserProvider(window.ethereum)
-        : null;
+    // Build 18-feature array from REAL blockchain data (Etherscan + RPC)
+    const provider = window.ethereum
+      ? new ethers.BrowserProvider(window.ethereum)
+      : null;
 
-      if (provider && transaction.from) {
-        const [balance, txCount] = await Promise.all([
+    let senderBalance = 0;
+    let senderNonce = 0;
+    if (provider && transaction.from) {
+      try {
+        const [bal, nonce] = await Promise.all([
           provider.getBalance(transaction.from),
           provider.getTransactionCount(transaction.from),
         ]);
-
-        const balEth = parseFloat(ethers.formatEther(balance));
-        features[3] = txCount; // sent_tnx (nonce)
-        features[8] = txCount > 0 ? balEth / txCount : 0; // avg_val_sent
-        features[9] = txValue; // total_ether_sent (current tx)
-        features[10] = balEth; // total_ether_balance
+        senderBalance = parseFloat(ethers.formatEther(bal));
+        senderNonce = nonce;
+      } catch {
+        // non-critical
       }
-    } catch {
-      // Non-critical — features stay 0, same as before
     }
+
+    const { features, source } = await buildWalletFeatures(
+      transaction.to, // Evaluate the RECIPIENT address
+      provider,
+      {
+        senderBalance,
+        senderNonce,
+        txValue,
+      },
+    );
+    console.log(`[dualVerification] Features from ${source}:`, features);
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), ML_API_TIMEOUT);
@@ -147,7 +133,7 @@ const runMlScamDetection = async (
         transaction_value: txValue,
         gas_price: gasPrice,
         is_contract_interaction: transaction.isContractInteraction || false,
-        acc_holder: transaction.from,
+        acc_holder: transaction.to, // Evaluate the RECIPIENT
         features,
       }),
       signal: controller.signal,
