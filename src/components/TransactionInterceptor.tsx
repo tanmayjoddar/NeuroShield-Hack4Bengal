@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ import contractService from "@/web3/contract";
 interface TransactionInterceptorProps {
   onClose: () => void;
   onBlock: () => void;
+  onDismiss?: () => void;
   toAddress: string;
   fromAddress: string;
   value: number;
@@ -27,9 +28,9 @@ interface TransactionInterceptorProps {
 }
 
 interface MLResponse {
-  prediction: number;
+  prediction: any;
   risk_score: number;
-  features: number[];
+  features: (number | string)[];
 }
 
 const isContractAddress = async (address: string): Promise<boolean> => {
@@ -63,21 +64,37 @@ const getTransactionLogs = () => {
 const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
   onClose,
   onBlock,
+  onDismiss,
   toAddress,
   fromAddress,
   value,
   gasPrice,
-  isSuccess = false,
+  isSuccess: isSuccessProp = false,
   transaction,
 }) => {
+  const dismiss = onDismiss ?? onBlock;
+
   const [whitelistedAddresses, setWhitelistedAddresses] = useState<string[]>(
     () => {
       const saved = localStorage.getItem("whitelisted-addresses");
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      try {
+        const parsed = JSON.parse(saved);
+        return Array.isArray(parsed)
+          ? parsed
+              .filter((v) => typeof v === "string")
+              .map((v) => v.toLowerCase())
+          : [];
+      } catch {
+        return [];
+      }
     },
   );
 
   const [mlResponse, setMlResponse] = useState<MLResponse | null>(null);
+  const [mlRawResponse, setMlRawResponse] = useState<any>(null);
+  const [mlDurationMs, setMlDurationMs] = useState<number | null>(null);
+  const [daoDurationMs, setDaoDurationMs] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMEVProtected, setIsMEVProtected] = useState<boolean | null>(null);
@@ -88,10 +105,25 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
     verdict: string;
   } | null>(null);
 
-  const isAddressWhitelisted = whitelistedAddresses.includes(toAddress);
+  // On-chain context for the recipient address
+  const [recipientContext, setRecipientContext] = useState<{
+    balance: number;
+    nonce: number;
+    isContract: boolean;
+  } | null>(null);
+
+  const normalizedToAddress = (toAddress || "").toLowerCase();
+  const isAddressWhitelisted = whitelistedAddresses.includes(normalizedToAddress);
+
+  const analysisRunRef = useRef(0);
+  const activeAbortControllerRef = useRef<AbortController | null>(null);
+  const activeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const addToWhitelist = () => {
-    const newWhitelist = [...whitelistedAddresses, toAddress];
+    const normalized = normalizedToAddress;
+    const newWhitelist = whitelistedAddresses.includes(normalized)
+      ? whitelistedAddresses
+      : [...whitelistedAddresses, normalized];
     setWhitelistedAddresses(newWhitelist);
     localStorage.setItem("whitelisted-addresses", JSON.stringify(newWhitelist));
     onClose();
@@ -99,7 +131,16 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
 
   useEffect(() => {
     const checkTransaction = async () => {
+      const runId = ++analysisRunRef.current;
       try {
+        setIsLoading(true);
+        setError(null);
+        setMlResponse(null);
+        setMlRawResponse(null);
+        setMlDurationMs(null);
+        setDaoDurationMs(null);
+        setDaoData(null);
+
         console.log("Starting ML risk assessment for transaction:", {
           fromAddress,
           toAddress,
@@ -107,47 +148,57 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
           gasPrice,
         });
 
-        // Check if address is a contract - do this first to avoid delays later
-        const isContract = await isContractAddress(toAddress);
-        console.log("Contract address check result:", isContract);
+        // ── Fetch on-chain context for BOTH sender and recipient in parallel ──
+        const provider = window.ethereum
+          ? new ethers.BrowserProvider(window.ethereum)
+          : null;
 
-        // Prepare 18-feature array matching the deployed ML model's schema:
-        //  [0]  avg_min_between_sent_tnx       [1]  avg_min_between_received_tnx
-        //  [2]  time_diff_mins                 [3]  sent_tnx
-        //  [4]  received_tnx                   [5]  number_of_created_contracts
-        //  [6]  max_value_received             [7]  avg_val_received
-        //  [8]  avg_val_sent                   [9]  total_ether_sent
-        //  [10] total_ether_balance            [11] erc20_total_ether_received
-        //  [12] erc20_total_ether_sent         [13] erc20_total_ether_sent_contract
-        //  [14] erc20_uniq_sent_addr           [15] erc20_uniq_rec_token_name
-        //  [16] erc20_most_sent_token_type (str)
-        //  [17] erc20_most_rec_token_type  (str)
         let senderBalance = 0;
         let senderNonce = 0;
-        try {
-          const provider = window.ethereum
-            ? new ethers.BrowserProvider(window.ethereum)
-            : null;
-          if (provider && fromAddress) {
-            const [bal, nonce] = await Promise.all([
-              provider.getBalance(fromAddress),
-              provider.getTransactionCount(fromAddress),
+        let recipientBalance = 0;
+        let recipientNonce = 0;
+        let isContract = false;
+
+        if (provider) {
+          try {
+            const results = await Promise.allSettled([
+              fromAddress ? provider.getBalance(fromAddress) : Promise.resolve(0n),
+              fromAddress ? provider.getTransactionCount(fromAddress) : Promise.resolve(0),
+              provider.getBalance(toAddress),
+              provider.getTransactionCount(toAddress),
+              provider.getCode(toAddress),
             ]);
-            senderBalance = parseFloat(ethers.formatEther(bal));
-            senderNonce = nonce;
+
+            if (results[0].status === "fulfilled") senderBalance = parseFloat(ethers.formatEther(results[0].value as bigint));
+            if (results[1].status === "fulfilled") senderNonce = results[1].value as number;
+            if (results[2].status === "fulfilled") recipientBalance = parseFloat(ethers.formatEther(results[2].value as bigint));
+            if (results[3].status === "fulfilled") recipientNonce = results[3].value as number;
+            if (results[4].status === "fulfilled") isContract = (results[4].value as string) !== "0x";
+          } catch {
+            // non-critical — features stay at defaults
           }
-        } catch {
-          // non-critical — features stay 0
         }
+
+        // Store recipient on-chain context for UI display and scoring
+        if (analysisRunRef.current === runId) {
+          setRecipientContext({ balance: recipientBalance, nonce: recipientNonce, isContract });
+        }
+
+        console.log("On-chain context:", {
+          sender: { balance: senderBalance, nonce: senderNonce },
+          recipient: { balance: recipientBalance, nonce: recipientNonce, isContract },
+        });
+
+        // Prepare 18-feature array matching the deployed ML model's schema
         const features: (number | string)[] = [
           0, // [0]  avg_min_between_sent_tnx
           0, // [1]  avg_min_between_received_tnx
           0, // [2]  time_diff_mins
           senderNonce, // [3]  sent_tnx
-          0, // [4]  received_tnx
+          recipientNonce, // [4]  received_tnx — use recipient nonce as proxy
           0, // [5]  number_of_created_contracts
-          0, // [6]  max_value_received
-          0, // [7]  avg_val_received
+          recipientBalance, // [6]  max_value_received — use recipient balance as proxy
+          recipientNonce > 0 ? recipientBalance / recipientNonce : 0, // [7] avg_val_received
           senderNonce > 0 ? senderBalance / senderNonce : 0, // [8] avg_val_sent
           value, // [9]  total_ether_sent
           senderBalance, // [10] total_ether_balance
@@ -165,9 +216,14 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
           to_address: toAddress,
           transaction_value: value,
           gas_price: gasPrice,
-          is_contract_interaction: isContract, // Use the value we already computed
+          is_contract_interaction: isContract,
           acc_holder: fromAddress,
           features,
+          // Extra on-chain context for downstream processing
+          recipient_balance: recipientBalance,
+          recipient_nonce: recipientNonce,
+          sender_balance: senderBalance,
+          sender_nonce: senderNonce,
         };
 
         console.log("Sending transaction data to ML service:", transactionData);
@@ -177,10 +233,14 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
 
           // Use ONLY the external ML API endpoint
           const controller = new AbortController();
+          activeAbortControllerRef.current = controller;
           const timeoutId = setTimeout(() => {
             controller.abort();
             console.warn("ML API request timed out after 15 seconds");
           }, 15000); // 15 second timeout
+          activeTimeoutRef.current = timeoutId;
+
+          const mlStart = performance.now();
 
           const response = await fetch("/ml-api/predict", {
             method: "POST",
@@ -191,7 +251,10 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
             signal: controller.signal,
           });
 
+          activeAbortControllerRef.current = null;
+
           clearTimeout(timeoutId);
+          activeTimeoutRef.current = null;
 
           if (!response.ok) {
             const errorText = await response.text();
@@ -202,22 +265,37 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
           }
 
           const data = await response.json();
+          const mlEnd = performance.now();
+
+          // Ignore stale results if a newer run started
+          if (analysisRunRef.current !== runId) return;
+
+          setMlRawResponse(data);
+          setMlDurationMs(Math.round(mlEnd - mlStart));
+
           console.log("ML API response received:", data);
 
-          if (!data || !data.prediction) {
+          const prediction =
+            data?.prediction ??
+            data?.Prediction ??
+            data?.result ??
+            data?.label ??
+            null;
+
+          if (!data || prediction == null) {
             console.error("ML response missing required fields:", data);
             throw new Error(
-              "Invalid response format from ML service - missing prediction data",
+              "Invalid response format from ML service (missing prediction)",
             );
           }
 
           // Convert the API response to our expected format
           const normalizedData = {
-            prediction: data.prediction,
-            risk_score: data.prediction === "Fraud" ? 0.8 : 0.2, // Convert string to numeric score
-            risk_level: data.prediction === "Fraud" ? "HIGH" : "LOW",
-            type: data.Type,
-            explanation: `ML Assessment: ${data.Type}`,
+            prediction,
+            risk_score: prediction === "Fraud" ? 0.8 : 0.2, // keep stable scoring; raw output shown separately
+            risk_level: prediction === "Fraud" ? "HIGH" : "LOW",
+            type: data?.Type ?? data?.type ?? "Unknown",
+            explanation: `ML Assessment: ${data?.Type ?? data?.type ?? "Unknown"}`,
             features: features, // Include the features array we prepared earlier
           };
 
@@ -230,6 +308,7 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
           // ══════════════════════════════════════════
           try {
             console.log("🏛️ Starting DAO community check for:", toAddress);
+            const daoStart = performance.now();
             const [isScammer, scamScore] = await Promise.all([
               contractService.isScamAddress(toAddress),
               contractService.getScamScore(toAddress),
@@ -252,6 +331,11 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
             if (isScammer) verdict = "confirmed_scam";
             else if (scamScore > 0 || activeProposals > 0)
               verdict = "under_review";
+
+            const daoEnd = performance.now();
+            if (analysisRunRef.current === runId) {
+              setDaoDurationMs(Math.round(daoEnd - daoStart));
+            }
 
             console.log("🏛️ DAO check result:", {
               isScammer,
@@ -313,11 +397,31 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
         });
       } finally {
         // Always finish loading state to avoid UI getting stuck
-        setIsLoading(false);
+        if (analysisRunRef.current === runId) {
+          setIsLoading(false);
+        }
       }
     };
 
     checkTransaction();
+
+    return () => {
+      // Invalidate this run so late promises don't update state
+      analysisRunRef.current++;
+
+      // Abort any in-flight ML request
+      try {
+        activeAbortControllerRef.current?.abort();
+      } catch {
+        // ignore
+      }
+      activeAbortControllerRef.current = null;
+
+      if (activeTimeoutRef.current) {
+        clearTimeout(activeTimeoutRef.current);
+        activeTimeoutRef.current = null;
+      }
+    };
   }, [fromAddress, toAddress, value, gasPrice]);
 
   // Prevent body scroll when modal is open
@@ -332,7 +436,7 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        dismiss();
       }
     };
 
@@ -342,7 +446,7 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
-      onClose();
+      dismiss();
     }
   };
 
@@ -352,7 +456,14 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
       try {
         const whitelist = localStorage.getItem("whitelisted-addresses");
         if (whitelist) {
-          setWhitelistedAddresses(JSON.parse(whitelist));
+          const parsed = JSON.parse(whitelist);
+          setWhitelistedAddresses(
+            Array.isArray(parsed)
+              ? parsed
+                  .filter((v) => typeof v === "string")
+                  .map((v) => v.toLowerCase())
+              : [],
+          );
         }
       } catch (error) {
         console.error("Error loading whitelist:", error);
@@ -378,6 +489,14 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
         riskLevel: risk.level,
         blocked: risk.blocked,
         whitelisted: risk.whitelisted,
+        ml: {
+          raw: mlRawResponse ?? null,
+          durationMs: mlDurationMs,
+        },
+        dao: {
+          data: daoData ?? null,
+          durationMs: daoDurationMs,
+        },
       };
 
       // Add to beginning of logs array (most recent first)
@@ -440,7 +559,7 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
           <CardContent className="p-6 text-center">
             <AlertTriangle className="h-8 w-8 text-red-500 mx-auto mb-4" />
             <p className="text-white">Failed to analyze transaction: {error}</p>
-            <Button onClick={onClose} className="mt-4">
+            <Button onClick={dismiss} className="mt-4">
               Close
             </Button>
           </CardContent>
@@ -451,16 +570,34 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
 
   // ══════════════════════════════════════════
   // DUAL-LAYER SCORE COMPUTATION (THE FLYWHEEL)
+  // Uses on-chain evidence to prevent false positives
   // ══════════════════════════════════════════
 
+  // Determine if the recipient is a "new/empty" wallet (no tx history, no balance)
+  const isNewEmptyWallet =
+    recipientContext != null &&
+    !recipientContext.isContract &&
+    recipientContext.nonce === 0 &&
+    recipientContext.balance === 0;
+
   // ML base score (0-100) — derived from ML API prediction
-  const mlScore = mlResponse
+  // If ML says Fraud but the address is just new/empty with ZERO DAO evidence,
+  // it's likely a false positive → cap at Medium (50)
+  let mlScore = mlResponse
     ? mlResponse.risk_score > 0.6
       ? 85
       : mlResponse.risk_score > 0.3
         ? 50
         : 10
     : 0;
+
+  // On-chain false-positive mitigation:
+  // A new empty wallet with 0 DAO reports is *unverified*, not *confirmed fraud*
+  const daoHasEvidence = daoData && (daoData.isScammer || daoData.scamScore > 0 || daoData.activeProposals > 0);
+  if (mlScore >= 85 && isNewEmptyWallet && !daoHasEvidence) {
+    mlScore = 45; // Downgrade to Medium — insufficient on-chain evidence for High
+    console.log("[Scoring] ML false-positive override: new empty wallet with no DAO reports → capped at 45");
+  }
 
   // Compute combined score incorporating DAO community data
   let combinedScore = mlScore;
@@ -478,7 +615,7 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
       );
       daoBoostAmount = combinedScore - mlScore;
     } else if (daoData.scamScore > 0 && mlScore < 30) {
-      // RULE 4: DAO has reports but ML says safe
+      // RULE 3: DAO has reports but ML says safe
       combinedScore = Math.max(40, daoData.scamScore);
       daoBoostAmount = combinedScore - mlScore;
     } else if (daoData.activeProposals > 0 && combinedScore < 30) {
@@ -491,6 +628,16 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
   const riskScore = combinedScore;
   const riskLevel = riskScore > 75 ? "High" : riskScore > 50 ? "Medium" : "Low";
 
+  // UI + logging should be consistent and respect whitelist.
+  // If recipient is trusted, we still show the raw ML output, but we do not block or label it as high risk.
+  const effectiveRiskScore = isAddressWhitelisted ? Math.min(riskScore, 10) : riskScore;
+  const effectiveRiskLevel = isAddressWhitelisted ? "Low" : riskLevel;
+  const effectiveIsSuccess = isAddressWhitelisted
+    ? true
+    : isSuccessProp
+      ? true
+      : effectiveRiskLevel !== "High";
+
   return (
     <div
       className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
@@ -498,16 +645,16 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
     >
       <Card
         className={`w-full max-w-2xl bg-black/90 backdrop-blur-lg border-2 animate-scale-in ${
-          isSuccess ? "border-green-500/30" : "border-red-500/30"
+          effectiveIsSuccess ? "border-green-500/30" : "border-red-500/30"
         }`}
       >
         <CardHeader
-          className={`border-b ${isSuccess ? "border-green-500/30" : "border-red-500/30"}`}
+          className={`border-b ${effectiveIsSuccess ? "border-green-500/30" : "border-red-500/30"}`}
         >
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center space-x-3 text-white">
               <div className="relative">
-                {isSuccess ? (
+                {effectiveIsSuccess ? (
                   <>
                     <Shield className="h-6 w-6 text-green-500" />
                     <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-ping"></div>
@@ -520,7 +667,7 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
                 )}
               </div>
               <span>
-                {isSuccess
+                {effectiveIsSuccess
                   ? "✅ SECURITY PASSED"
                   : "🚨 DUAL-LAYER RISK ASSESSMENT"}
               </span>
@@ -541,16 +688,16 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
             )}
 
             <button
-              onClick={onClose}
+              onClick={dismiss}
               className="text-gray-400 hover:text-white transition-colors p-1 rounded"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
           <p
-            className={`text-sm ${isSuccess ? "text-green-400" : "text-red-400"}`}
+            className={`text-sm ${effectiveIsSuccess ? "text-green-400" : "text-red-400"}`}
           >
-            {isSuccess
+            {effectiveIsSuccess
               ? "Dual-layer security analysis passed. Transaction appears safe to proceed."
               : "ML + DAO community analysis completed. Review the dual-layer assessment below."}
           </p>
@@ -575,25 +722,34 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
             {/* Layer 1: ML Assessment */}
             <div
               className={`flex items-center justify-between p-3 rounded-lg border ${
-                isSuccess
+                effectiveIsSuccess
                   ? "bg-green-500/5 border-green-500/20"
                   : "bg-white/5 border-white/10"
               }`}
             >
               <div className="flex items-center space-x-3">
                 <Brain
-                  className={`h-5 w-5 ${isSuccess ? "text-green-400" : "text-cyan-400"}`}
+                  className={`h-5 w-5 ${effectiveIsSuccess ? "text-green-400" : "text-cyan-400"}`}
                 />
                 <div>
                   <div className="text-white text-sm font-medium">
                     Layer 1 — ML Model
                   </div>
                   <div className="text-xs text-gray-500">
-                    Real-time fraud detection
+                    {mlRawResponse?.prediction
+                      ? `External ML: ${mlRawResponse.prediction}${mlRawResponse.Type ? ` (${mlRawResponse.Type})` : ""}${isNewEmptyWallet && !daoHasEvidence && mlRawResponse.prediction === "Fraud" ? " — adjusted (new wallet)" : ""}`
+                      : "Real-time fraud detection"}
                   </div>
                 </div>
               </div>
-              <div className="text-lg font-bold text-cyan-400">{mlScore}%</div>
+              <div className="text-right">
+                <div className="text-lg font-bold text-cyan-400">{mlScore}%</div>
+                <div className="text-[11px] text-gray-500">
+                  {mlDurationMs != null ? `ML ${mlDurationMs}ms` : ""}
+                  {mlDurationMs != null && daoDurationMs != null ? " • " : ""}
+                  {daoDurationMs != null ? `DAO ${daoDurationMs}ms` : ""}
+                </div>
+              </div>
             </div>
 
             {/* Layer 2: DAO Community */}
@@ -643,11 +799,11 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
             {/* Combined Score */}
             <div
               className={`flex items-center justify-between p-4 rounded-lg border-2 ${
-                isSuccess
+                effectiveIsSuccess
                   ? "bg-green-500/10 border-green-500/40"
-                  : riskLevel === "High"
+                  : effectiveRiskLevel === "High"
                     ? "bg-red-500/10 border-red-500/40"
-                    : riskLevel === "Medium"
+                    : effectiveRiskLevel === "Medium"
                       ? "bg-yellow-500/10 border-yellow-500/40"
                       : "bg-green-500/10 border-green-500/40"
               }`}
@@ -655,60 +811,110 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
               <div className="flex items-center space-x-3">
                 <Zap
                   className={`h-6 w-6 ${
-                    isSuccess
+                    effectiveIsSuccess
                       ? "text-green-500"
-                      : riskLevel === "High"
+                      : effectiveRiskLevel === "High"
                         ? "text-red-500"
-                        : riskLevel === "Medium"
+                        : effectiveRiskLevel === "Medium"
                           ? "text-yellow-500"
                           : "text-green-500"
                   }`}
                 />
                 <div>
                   <div className="text-white font-semibold">
-                    {isSuccess
+                    {effectiveIsSuccess
                       ? "Security Analysis Result"
                       : "Combined Risk Score"}
                   </div>
                   <div className="text-xs text-gray-400">
                     {daoBoostAmount > 0
                       ? "⚡ ML + DAO Flywheel Active"
-                      : isSuccess
+                      : effectiveIsSuccess
                         ? "Dual-layer analysis complete"
-                        : "ML assessment only — report to DAO to strengthen"}
+                        : isNewEmptyWallet && !daoHasEvidence
+                          ? "⚠️ Unverified new wallet — on-chain evidence insufficient"
+                          : "ML assessment only — report to DAO to strengthen"}
                   </div>
                 </div>
               </div>
               <div className="text-right">
                 <div
                   className={`text-3xl font-bold ${
-                    isSuccess
+                    effectiveIsSuccess
                       ? "text-green-500"
-                      : riskLevel === "High"
+                      : effectiveRiskLevel === "High"
                         ? "text-red-500"
-                        : riskLevel === "Medium"
+                        : effectiveRiskLevel === "Medium"
                           ? "text-yellow-500"
                           : "text-green-500"
                   }`}
                 >
-                  {riskScore.toFixed(1)}%
+                  {effectiveRiskScore.toFixed(1)}%
                 </div>
                 <Badge
                   className={
-                    isSuccess
+                    effectiveIsSuccess
                       ? "bg-green-500/20 text-green-400"
-                      : riskLevel === "High"
+                      : effectiveRiskLevel === "High"
                         ? "bg-red-500/20 text-red-400"
-                        : riskLevel === "Medium"
+                        : effectiveRiskLevel === "Medium"
                           ? "bg-yellow-500/20 text-yellow-400"
                           : "bg-green-500/20 text-green-400"
                   }
                 >
-                  {isSuccess ? "SAFE" : `${riskLevel} RISK`}
+                  {effectiveIsSuccess ? "SAFE" : `${effectiveRiskLevel} RISK`}
                 </Badge>
               </div>
             </div>
           </div>
+
+          {/* On-chain evidence panel */}
+          {recipientContext && (
+            <div className="space-y-3">
+              <h3 className="text-white font-semibold flex items-center space-x-2">
+                <ExternalLink className="h-5 w-5 text-cyan-400" />
+                <span>On-Chain Evidence</span>
+              </h3>
+              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <div className="text-xs text-gray-400">Recipient Balance</div>
+                    <div className="text-white font-medium mt-1">{recipientContext.balance.toFixed(6)} ETH</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Recipient Txns</div>
+                    <div className="text-white font-medium mt-1">{recipientContext.nonce}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Type</div>
+                    <div className="text-white font-medium mt-1">{recipientContext.isContract ? "📄 Contract" : "👤 EOA"}</div>
+                  </div>
+                </div>
+                {isNewEmptyWallet && !daoHasEvidence && (
+                  <div className="mt-3 text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded p-2">
+                    ⚠️ This is a new wallet with no transaction history and no DAO reports.
+                    ML risk was adjusted downward because there is no on-chain evidence of fraud.
+                  </div>
+                )}
+                {daoData?.isScammer && (
+                  <div className="mt-3 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded p-2">
+                    🚨 This address has been confirmed as a scam by DAO community vote (on-chain).
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* External ML raw output (debug) */}
+          <details className="bg-white/5 rounded-lg p-4 border border-white/10">
+            <summary className="text-sm text-gray-300 cursor-pointer select-none">
+              External ML output (raw JSON)
+              {mlDurationMs != null ? ` — ${mlDurationMs}ms` : ""}
+            </summary>
+            <pre className="mt-3 text-xs text-gray-200 overflow-x-auto whitespace-pre-wrap break-words">
+              {mlRawResponse ? JSON.stringify(mlRawResponse, null, 2) : "No ML response captured."}
+            </pre>
+          </details>
           {/* Transaction Details */}
           <div className="space-y-3">
             <h3 className="text-white font-semibold flex items-center space-x-2">
@@ -773,8 +979,8 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
                   logTransactionAttempt(
                     { fromAddress, toAddress, value, gasPrice },
                     {
-                      score: riskScore,
-                      level: riskLevel,
+                      score: effectiveRiskScore,
+                      level: effectiveRiskLevel,
                       blocked: false,
                       whitelisted: true,
                     },
@@ -795,8 +1001,8 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
                   logTransactionAttempt(
                     { fromAddress, toAddress, value, gasPrice },
                     {
-                      score: riskScore,
-                      level: riskLevel,
+                      score: effectiveRiskScore,
+                      level: effectiveRiskLevel,
                       blocked: false,
                       whitelisted: isAddressWhitelisted,
                     },
@@ -804,21 +1010,21 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
                   onClose();
                 }}
                 className={`${
-                  isSuccess
+                  effectiveIsSuccess
                     ? "border-green-500/30 text-green-400 hover:bg-green-500/10"
                     : "border-gray-500/30 text-gray-400 hover:bg-gray-500/10"
                 }`}
               >
-                {isSuccess ? "✅ Proceed to MetaMask" : "Sign Anyway"}
+                {effectiveIsSuccess ? "✅ Proceed to MetaMask" : "Sign Anyway"}
               </Button>
-              {!isSuccess && !isAddressWhitelisted && riskLevel === "High" && (
+              {!effectiveIsSuccess && !isAddressWhitelisted && effectiveRiskLevel === "High" && (
                 <Button
                   onClick={() => {
                     logTransactionAttempt(
                       { fromAddress, toAddress, value, gasPrice },
                       {
-                        score: riskScore,
-                        level: riskLevel,
+                        score: effectiveRiskScore,
+                        level: effectiveRiskLevel,
                         blocked: true,
                         whitelisted: false,
                       },
@@ -830,14 +1036,14 @@ const TransactionInterceptor: React.FC<TransactionInterceptorProps> = ({
                   🛑 Block Transaction
                 </Button>
               )}
-              {isSuccess && (
+              {effectiveIsSuccess && (
                 <Button
                   onClick={() => {
                     logTransactionAttempt(
                       { fromAddress, toAddress, value, gasPrice },
                       {
-                        score: riskScore,
-                        level: riskLevel,
+                        score: effectiveRiskScore,
+                        level: effectiveRiskLevel,
                         blocked: true,
                         whitelisted: false,
                       },

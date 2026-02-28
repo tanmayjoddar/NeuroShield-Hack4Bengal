@@ -135,6 +135,11 @@ const Send = () => {
       // Prepare transaction but don't send
       const tx = await prepareSendTransaction();
       setPendingTx(tx);
+      try {
+        setGasPrice(Number(ethers.formatUnits(tx.gasPrice, "gwei")));
+      } catch {
+        // non-fatal
+      }
       setShowInterceptor(true);
 
     } catch (err: any) {
@@ -156,6 +161,13 @@ const Send = () => {
       variant: "default"
     });
     resetForm();
+  };
+
+  const handleDismissInterceptor = () => {
+    // User dismissed the interceptor (Esc/backdrop/X). Do not send.
+    setShowInterceptor(false);
+    setPendingTx(null);
+    setIsProcessing(false);
   };
 
   const handleProceedAnyway = async () => {
@@ -230,6 +242,7 @@ const Send = () => {
         <TransactionInterceptor
           onClose={handleProceedAnyway}
           onBlock={handleBlockTransaction}
+          onDismiss={handleDismissInterceptor}
           fromAddress={walletConnector.address || ''}
           toAddress={toAddress}
           value={parseFloat(amount)}

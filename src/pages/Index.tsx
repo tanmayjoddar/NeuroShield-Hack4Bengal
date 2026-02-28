@@ -1035,6 +1035,7 @@ const Index = () => {
         <TransactionInterceptor
           onClose={handleCloseInterceptor}
           onBlock={handleBlockTransaction}
+          onDismiss={handleCloseInterceptor}
           fromAddress={transactionDetails.fromAddress}
           toAddress={transactionDetails.toAddress}
           value={transactionDetails.value}

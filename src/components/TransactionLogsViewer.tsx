@@ -4,12 +4,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 interface TransactionLog {
   to: string;
   from?: string;
-  value: string;
+  value: string | number;
   riskLevel: "Low" | "Medium" | "High";
   riskScore: number;
   blocked: boolean;
   timestamp: string;
   hash?: string;
+  ml?: {
+    raw?: any;
+    durationMs?: number | null;
+  };
+  dao?: {
+    data?: any;
+    durationMs?: number | null;
+  };
 }
 
 // Function to retrieve transaction logs from localStorage
@@ -74,49 +82,111 @@ const TransactionLogsViewer: React.FC = () => {
           </div>
         ) : (
           <div className="max-h-[600px] overflow-y-auto space-y-2 pr-1">
-            {logs.map((log, index) => (
-              <div
-                key={log.hash || index}
-                className={`p-4 rounded-lg transition-colors ${
-                  log.blocked
-                    ? "bg-red-500/10 border border-red-500/30 hover:bg-red-500/15"
-                    : log.riskLevel === "High"
-                      ? "bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/15"
-                      : log.riskLevel === "Medium"
-                        ? "bg-yellow-500/10 border border-yellow-500/20 hover:bg-yellow-500/15"
-                        : "bg-white/5 border border-white/10 hover:bg-white/10"
-                }`}
-              >
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-white font-mono">
-                    To: {log.to.substring(0, 6)}...
-                    {log.to.substring(log.to.length - 4)}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {log.blocked && (
-                      <span className="text-xs bg-red-500/30 text-red-300 px-2 py-0.5 rounded-full font-medium">
-                        BLOCKED
+            {logs.map((log, index) => {
+              const riskScore =
+                typeof log.riskScore === "number"
+                  ? log.riskScore
+                  : Number(log.riskScore) || 0;
+
+              const mlPrediction =
+                log.ml?.raw?.prediction ??
+                log.ml?.raw?.Prediction ??
+                log.ml?.raw?.result ??
+                log.ml?.raw?.label ??
+                null;
+
+              return (
+                <div
+                  key={log.hash || index}
+                  className={`p-4 rounded-lg transition-colors ${
+                    log.blocked
+                      ? "bg-red-500/10 border border-red-500/30 hover:bg-red-500/15"
+                      : log.riskLevel === "High"
+                        ? "bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/15"
+                        : log.riskLevel === "Medium"
+                          ? "bg-yellow-500/10 border border-yellow-500/20 hover:bg-yellow-500/15"
+                          : "bg-white/5 border border-white/10 hover:bg-white/10"
+                  }`}
+                >
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-white font-mono">
+                      To: {log.to.substring(0, 6)}...
+                      {log.to.substring(log.to.length - 4)}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {log.blocked && (
+                        <span className="text-xs bg-red-500/30 text-red-300 px-2 py-0.5 rounded-full font-medium">
+                          BLOCKED
+                        </span>
+                      )}
+                      <span
+                        className={`font-medium ${
+                          log.riskLevel === "High"
+                            ? "text-red-400"
+                            : log.riskLevel === "Medium"
+                              ? "text-yellow-400"
+                              : "text-green-400"
+                        }`}
+                      >
+                        {log.riskLevel} Risk — {riskScore.toFixed(1)}%
                       </span>
-                    )}
-                    <span
-                      className={`font-medium ${
-                        log.riskLevel === "High"
-                          ? "text-red-400"
-                          : log.riskLevel === "Medium"
-                            ? "text-yellow-400"
-                            : "text-green-400"
-                      }`}
-                    >
-                      {log.riskLevel} Risk — {log.riskScore.toFixed(1)}%
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between text-xs text-gray-400 mt-2 gap-4">
+                    <span className="text-gray-300">{log.value} ETH</span>
+                    <span className="text-right">
+                      {new Date(log.timestamp).toLocaleString()}
                     </span>
                   </div>
+
+                  {(log.ml?.durationMs != null || log.dao?.durationMs != null) && (
+                    <div className="flex justify-between text-xs text-gray-400 mt-2">
+                      <span>
+                        ML:{" "}
+                        {log.ml?.durationMs != null
+                          ? `${log.ml.durationMs}ms`
+                          : "n/a"}
+                        {"  "}DAO:{" "}
+                        {log.dao?.durationMs != null
+                          ? `${log.dao.durationMs}ms`
+                          : "n/a"}
+                      </span>
+                      {mlPrediction != null && (
+                        <span className="text-gray-300">
+                          ML: {String(mlPrediction)}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {(log.ml?.raw != null || log.dao?.data != null) && (
+                    <div className="mt-3 space-y-2">
+                      {log.ml?.raw != null && (
+                        <details className="text-xs text-gray-400">
+                          <summary className="cursor-pointer select-none text-gray-300 hover:text-white">
+                            ML raw output
+                          </summary>
+                          <pre className="mt-2 whitespace-pre-wrap break-words bg-black/30 border border-white/10 rounded p-2 text-gray-200">
+                            {JSON.stringify(log.ml.raw, null, 2)}
+                          </pre>
+                        </details>
+                      )}
+                      {log.dao?.data != null && (
+                        <details className="text-xs text-gray-400">
+                          <summary className="cursor-pointer select-none text-gray-300 hover:text-white">
+                            DAO details
+                          </summary>
+                          <pre className="mt-2 whitespace-pre-wrap break-words bg-black/30 border border-white/10 rounded p-2 text-gray-200">
+                            {JSON.stringify(log.dao.data, null, 2)}
+                          </pre>
+                        </details>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div className="flex justify-between text-xs text-gray-400 mt-2">
-                  <span className="text-gray-300">{log.value} ETH</span>
-                  <span>{new Date(log.timestamp).toLocaleString()}</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CardContent>
